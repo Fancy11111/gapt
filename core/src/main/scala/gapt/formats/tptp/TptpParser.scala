@@ -42,11 +42,15 @@ class TptpParser( val input: ParserInput ) extends Parser {
   private def TPTP_input = rule { annotated_formula | include }
 
   private def annotated_formula = rule {
-    atomic_word ~ "(" ~ Ws ~ name ~ Comma ~ formula_role ~ Comma ~ formula ~ annotations ~ ")." ~ Ws ~>
+    atomic_word ~ "(" ~ Ws ~ name ~ Comma ~ ( ( capture( "type" ) ~ Comma ~ typedef ) | ( formula_role ~ Comma ~ formula ) ) ~ annotations ~ ")." ~ Ws ~>
       ( AnnotatedFormula( _, _, _, _, _ ) )
   }
+  // TODO: maybe fix the list of possible roles to values defined in specs
   private def formula_role = rule { atomic_word }
   private def annotations = rule { ( Comma ~ general_term ).* }
+
+  private def typedef: Rule1[Formula] = rule { ( variable ~ ":" ~ Ws ~ name ) ~> ( ( a: FOLVar, b: String ) => Top() ) }
+  // private def typedef: Rule1[Formula] = rule { (variable ~  ":" ~ Ws ~ name)  ~> ((b:String, a: FOLVar) => FOLAtom(a.name, a) ) }
 
   private def formula = rule { typed_logic_formula }
   private def typed_logic_formula = rule { logic_formula } //add type annotation
