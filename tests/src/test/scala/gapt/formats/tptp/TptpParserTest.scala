@@ -20,4 +20,8 @@ class TptpParserTest extends Specification {
     ok
   }
 
+  "tffProblem" in {
+    loadTPTP( "ANA134_1.002.032.p" )
+    ok
+  }
 }

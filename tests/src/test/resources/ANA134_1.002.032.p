@@ -1,0 +1,605 @@
+%------------------------------------------------------------------------------
+% File     : ANA134_1.002.032 : TPTP v8.2.0. Released v8.2.0.
+% Domain   : Number theory
+% Problem  : composition_tower_f2_sz32__1
+% Version  : Especial.
+% English  : lim[x -> l1](f_i1(x)) ~ l
+%            lim[x -> l2](f_i2(x)) ~ l1
+%            lim[x -> l3](f_i3(x)) ~ l2
+%            ...
+%            lim[x -> l31](f_i31(x)) ~ l30
+%            lim[x -> a](f_i32(x)) ~ l31
+%            ============================
+%            lim[x -> a](f_i1(f_i2(f_i3(...f_i32(x)...)))) ~ l
+%            where
+%            - 2 functions with arity 1
+%            - 32 number of function applications
+
+% Refs     : [Sch22] Schoisswohl (2022), Email to G. Sutcliffe
+%          : [[KK+23](https://tptp.org/cgi-bin/SeeTPTP?Category=BibTeX&File=KK+23)] Korovin et al. (2023), ALASCA: Reasoning in Quantified
+% Source   : [Sch22]
+% Names    : composition_tower_f2_sz32__1.smt2 [Sch22]
+
+% Status   : Theorem
+% Rating   : 1.00 v8.2.0
+% Syntax   : Number of formulae    :   68 (   0 unt;  35 typ;   0 def)
+%            Number of atoms       :  363 (  33 equ)
+%            Maximal formula atoms :   11 (  11 avg)
+%            Number of connectives :  429 (  99   ~;   0   |; 132   &)
+%                                         (   0 <=>; 198  =>;   0  <=;   0 <~>)
+%            Maximal formula depth :   11 (  11 avg)
+%            Maximal term depth    :   35 (   3 avg)
+%            Number arithmetic     :  957 ( 330 atm; 330 fun; 198 num;  99 var)
+%            Number of types       :    1 (   0 usr;   1 ari)
+%            Number of type conns  :    2 (   2   >;   0   *;   0   +;   0  <<)
+%            Number of predicates  :    3 (   0 usr;   0 prp; 2-2 aty)
+%            Number of functors    :   38 (  35 usr;  34 con; 0-2 aty)
+%            Number of variables   :   99 (  66   !;  33   ?;  99   :)
+% SPC      : TF0_THM_EQU_ARI
+
+% Comments : Translated from SMT UFLRA by SMTtoTPTP.
+%------------------------------------------------------------------------------
+%% Declarations:
+%% Assertions:
+%% âˆ€ epsilon:Real ((0.0 < epsilon) â‡’ âˆƒ delta:Real ((0.0 < delta) âˆ§ âˆ€ x:Real ((Â¬(x = l1) âˆ§ ((if ((x - l1) â‰¥ 0.0) (x - l1) else -(x - l1)) < delta)) â‡’ ((if ((f1(x) - l) â‰¥ 0.0) (f1(x) - l) else -(f1(x) - l)) < epsilon))))
+tff(formula_1,axiom,
+    ! [Epsilon: $real] :
+      ( $less(0.0,Epsilon)
+     => ? [Delta: $real] :
+          ( $less(0.0,Delta)
+          & ! [X: $real] :
+              ( ( ( X != l1 )
+                & ( $greatereq($difference(X,l1),0.0)
+                 => $less($difference(X,l1),Delta) )
+                & ( ~ $greatereq($difference(X,l1),0.0)
+                 => $less($uminus($difference(X,l1)),Delta) ) )
+             => ( ( $greatereq($difference(f1(X),l),0.0)
+                 => $less($difference(f1(X),l),Epsilon) )
+                & ( ~ $greatereq($difference(f1(X),l),0.0)
+                 => $less($uminus($difference(f1(X),l)),Epsilon) ) ) ) ) ) ).
+
+%% âˆ€ epsilon:Real ((0.0 < epsilon) â‡’ âˆƒ delta:Real ((0.0 < delta) âˆ§ âˆ€ x:Real ((Â¬(x = l2) âˆ§ ((if ((x - l2) â‰¥ 0.0) (x - l2) else -(x - l2)) < delta)) â‡’ ((if ((f1(x) - l1) â‰¥ 0.0) (f1(x) - l1) else -(f1(x) - l1)) < epsilon))))
+tff(formula_2,axiom,
+    ! [Epsilon: $real] :
+      ( $less(0.0,Epsilon)
+     => ? [Delta: $real] :
+          ( $less(0.0,Delta)
+          & ! [X: $real] :
+              ( ( ( X != l2 )
+                & ( $greatereq($difference(X,l2),0.0)
+                 => $less($difference(X,l2),Delta) )
+                & ( ~ $greatereq($difference(X,l2),0.0)
+                 => $less($uminus($difference(X,l2)),Delta) ) )
+             => ( ( $greatereq($difference(f1(X),l1),0.0)
+                 => $less($difference(f1(X),l1),Epsilon) )
+                & ( ~ $greatereq($difference(f1(X),l1),0.0)
+                 => $less($uminus($difference(f1(X),l1)),Epsilon) ) ) ) ) ) ).
+
+%% âˆ€ epsilon:Real ((0.0 < epsilon) â‡’ âˆƒ delta:Real ((0.0 < delta) âˆ§ âˆ€ x:Real ((Â¬(x = l3) âˆ§ ((if ((x - l3) â‰¥ 0.0) (x - l3) else -(x - l3)) < delta)) â‡’ ((if ((f0(x) - l2) â‰¥ 0.0) (f0(x) - l2) else -(f0(x) - l2)) < epsilon))))
+tff(formula_3,axiom,
+    ! [Epsilon: $real] :
+      ( $less(0.0,Epsilon)
+     => ? [Delta: $real] :
+          ( $less(0.0,Delta)
+          & ! [X: $real] :
+              ( ( ( X != l3 )
+                & ( $greatereq($difference(X,l3),0.0)
+                 => $less($difference(X,l3),Delta) )
+                & ( ~ $greatereq($difference(X,l3),0.0)
+                 => $less($uminus($difference(X,l3)),Delta) ) )
+             => ( ( $greatereq($difference(f0(X),l2),0.0)
+                 => $less($difference(f0(X),l2),Epsilon) )
+                & ( ~ $greatereq($difference(f0(X),l2),0.0)
+                 => $less($uminus($difference(f0(X),l2)),Epsilon) ) ) ) ) ) ).
+
+%% âˆ€ epsilon:Real ((0.0 < epsilon) â‡’ âˆƒ delta:Real ((0.0 < delta) âˆ§ âˆ€ x:Real ((Â¬(x = l4) âˆ§ ((if ((x - l4) â‰¥ 0.0) (x - l4) else -(x - l4)) < delta)) â‡’ ((if ((f0(x) - l3) â‰¥ 0.0) (f0(x) - l3) else -(f0(x) - l3)) < epsilon))))
+tff(formula_4,axiom,
+    ! [Epsilon: $real] :
+      ( $less(0.0,Epsilon)
+     => ? [Delta: $real] :
+          ( $less(0.0,Delta)
+          & ! [X: $real] :
+              ( ( ( X != l4 )
+                & ( $greatereq($difference(X,l4),0.0)
+                 => $less($difference(X,l4),Delta) )
+                & ( ~ $greatereq($difference(X,l4),0.0)
+                 => $less($uminus($difference(X,l4)),Delta) ) )
+             => ( ( $greatereq($difference(f0(X),l3),0.0)
+                 => $less($difference(f0(X),l3),Epsilon) )
+                & ( ~ $greatereq($difference(f0(X),l3),0.0)
+                 => $less($uminus($difference(f0(X),l3)),Epsilon) ) ) ) ) ) ).
+
+%% âˆ€ epsilon:Real ((0.0 < epsilon) â‡’ âˆƒ delta:Real ((0.0 < delta) âˆ§ âˆ€ x:Real ((Â¬(x = l5) âˆ§ ((if ((x - l5) â‰¥ 0.0) (x - l5) else -(x - l5)) < delta)) â‡’ ((if ((f0(x) - l4) â‰¥ 0.0) (f0(x) - l4) else -(f0(x) - l4)) < epsilon))))
+tff(formula_5,axiom,
+    ! [Epsilon: $real] :
+      ( $less(0.0,Epsilon)
+     => ? [Delta: $real] :
+          ( $less(0.0,Delta)
+          & ! [X: $real] :
+              ( ( ( X != l5 )
+                & ( $greatereq($difference(X,l5),0.0)
+                 => $less($difference(X,l5),Delta) )
+                & ( ~ $greatereq($difference(X,l5),0.0)
+                 => $less($uminus($difference(X,l5)),Delta) ) )
+             => ( ( $greatereq($difference(f0(X),l4),0.0)
+                 => $less($difference(f0(X),l4),Epsilon) )
+                & ( ~ $greatereq($difference(f0(X),l4),0.0)
+                 => $less($uminus($difference(f0(X),l4)),Epsilon) ) ) ) ) ) ).
+
+%% âˆ€ epsilon:Real ((0.0 < epsilon) â‡’ âˆƒ delta:Real ((0.0 < delta) âˆ§ âˆ€ x:Real ((Â¬(x = l6) âˆ§ ((if ((x - l6) â‰¥ 0.0) (x - l6) else -(x - l6)) < delta)) â‡’ ((if ((f1(x) - l5) â‰¥ 0.0) (f1(x) - l5) else -(f1(x) - l5)) < epsilon))))
+tff(formula_6,axiom,
+    ! [Epsilon: $real] :
+      ( $less(0.0,Epsilon)
+     => ? [Delta: $real] :
+          ( $less(0.0,Delta)
+          & ! [X: $real] :
+              ( ( ( X != l6 )
+                & ( $greatereq($difference(X,l6),0.0)
+                 => $less($difference(X,l6),Delta) )
+                & ( ~ $greatereq($difference(X,l6),0.0)
+                 => $less($uminus($difference(X,l6)),Delta) ) )
+             => ( ( $greatereq($difference(f1(X),l5),0.0)
+                 => $less($difference(f1(X),l5),Epsilon) )
+                & ( ~ $greatereq($difference(f1(X),l5),0.0)
+                 => $less($uminus($difference(f1(X),l5)),Epsilon) ) ) ) ) ) ).
+
+%% âˆ€ epsilon:Real ((0.0 < epsilon) â‡’ âˆƒ delta:Real ((0.0 < delta) âˆ§ âˆ€ x:Real ((Â¬(x = l7) âˆ§ ((if ((x - l7) â‰¥ 0.0) (x - l7) else -(x - l7)) < delta)) â‡’ ((if ((f0(x) - l6) â‰¥ 0.0) (f0(x) - l6) else -(f0(x) - l6)) < epsilon))))
+tff(formula_7,axiom,
+    ! [Epsilon: $real] :
+      ( $less(0.0,Epsilon)
+     => ? [Delta: $real] :
+          ( $less(0.0,Delta)
+          & ! [X: $real] :
+              ( ( ( X != l7 )
+                & ( $greatereq($difference(X,l7),0.0)
+                 => $less($difference(X,l7),Delta) )
+                & ( ~ $greatereq($difference(X,l7),0.0)
+                 => $less($uminus($difference(X,l7)),Delta) ) )
+             => ( ( $greatereq($difference(f0(X),l6),0.0)
+                 => $less($difference(f0(X),l6),Epsilon) )
+                & ( ~ $greatereq($difference(f0(X),l6),0.0)
+                 => $less($uminus($difference(f0(X),l6)),Epsilon) ) ) ) ) ) ).
+
+%% âˆ€ epsilon:Real ((0.0 < epsilon) â‡’ âˆƒ delta:Real ((0.0 < delta) âˆ§ âˆ€ x:Real ((Â¬(x = l8) âˆ§ ((if ((x - l8) â‰¥ 0.0) (x - l8) else -(x - l8)) < delta)) â‡’ ((if ((f1(x) - l7) â‰¥ 0.0) (f1(x) - l7) else -(f1(x) - l7)) < epsilon))))
+tff(formula_8,axiom,
+    ! [Epsilon: $real] :
+      ( $less(0.0,Epsilon)
+     => ? [Delta: $real] :
+          ( $less(0.0,Delta)
+          & ! [X: $real] :
+              ( ( ( X != l8 )
+                & ( $greatereq($difference(X,l8),0.0)
+                 => $less($difference(X,l8),Delta) )
+                & ( ~ $greatereq($difference(X,l8),0.0)
+                 => $less($uminus($difference(X,l8)),Delta) ) )
+             => ( ( $greatereq($difference(f1(X),l7),0.0)
+                 => $less($difference(f1(X),l7),Epsilon) )
+                & ( ~ $greatereq($difference(f1(X),l7),0.0)
+                 => $less($uminus($difference(f1(X),l7)),Epsilon) ) ) ) ) ) ).
+
+%% âˆ€ epsilon:Real ((0.0 < epsilon) â‡’ âˆƒ delta:Real ((0.0 < delta) âˆ§ âˆ€ x:Real ((Â¬(x = l9) âˆ§ ((if ((x - l9) â‰¥ 0.0) (x - l9) else -(x - l9)) < delta)) â‡’ ((if ((f1(x) - l8) â‰¥ 0.0) (f1(x) - l8) else -(f1(x) - l8)) < epsilon))))
+tff(formula_9,axiom,
+    ! [Epsilon: $real] :
+      ( $less(0.0,Epsilon)
+     => ? [Delta: $real] :
+          ( $less(0.0,Delta)
+          & ! [X: $real] :
+              ( ( ( X != l9 )
+                & ( $greatereq($difference(X,l9),0.0)
+                 => $less($difference(X,l9),Delta) )
+                & ( ~ $greatereq($difference(X,l9),0.0)
+                 => $less($uminus($difference(X,l9)),Delta) ) )
+             => ( ( $greatereq($difference(f1(X),l8),0.0)
+                 => $less($difference(f1(X),l8),Epsilon) )
+                & ( ~ $greatereq($difference(f1(X),l8),0.0)
+                 => $less($uminus($difference(f1(X),l8)),Epsilon) ) ) ) ) ) ).
+
+%% âˆ€ epsilon:Real ((0.0 < epsilon) â‡’ âˆƒ delta:Real ((0.0 < delta) âˆ§ âˆ€ x:Real ((Â¬(x = l10) âˆ§ ((if ((x - l10) â‰¥ 0.0) (x - l10) else -(x - l10)) < delta)) â‡’ ((if ((f0(x) - l9) â‰¥ 0.0) (f0(x) - l9) else -(f0(x) - l9)) < epsilon))))
+tff(formula_10,axiom,
+    ! [Epsilon: $real] :
+      ( $less(0.0,Epsilon)
+     => ? [Delta: $real] :
+          ( $less(0.0,Delta)
+          & ! [X: $real] :
+              ( ( ( X != l10 )
+                & ( $greatereq($difference(X,l10),0.0)
+                 => $less($difference(X,l10),Delta) )
+                & ( ~ $greatereq($difference(X,l10),0.0)
+                 => $less($uminus($difference(X,l10)),Delta) ) )
+             => ( ( $greatereq($difference(f0(X),l9),0.0)
+                 => $less($difference(f0(X),l9),Epsilon) )
+                & ( ~ $greatereq($difference(f0(X),l9),0.0)
+                 => $less($uminus($difference(f0(X),l9)),Epsilon) ) ) ) ) ) ).
+
+%% âˆ€ epsilon:Real ((0.0 < epsilon) â‡’ âˆƒ delta:Real ((0.0 < delta) âˆ§ âˆ€ x:Real ((Â¬(x = l11) âˆ§ ((if ((x - l11) â‰¥ 0.0) (x - l11) else -(x - l11)) < delta)) â‡’ ((if ((f0(x) - l10) â‰¥ 0.0) (f0(x) - l10) else -(f0(x) - l10)) < epsilon))))
+tff(formula_11,axiom,
+    ! [Epsilon: $real] :
+      ( $less(0.0,Epsilon)
+     => ? [Delta: $real] :
+          ( $less(0.0,Delta)
+          & ! [X: $real] :
+              ( ( ( X != l11 )
+                & ( $greatereq($difference(X,l11),0.0)
+                 => $less($difference(X,l11),Delta) )
+                & ( ~ $greatereq($difference(X,l11),0.0)
+                 => $less($uminus($difference(X,l11)),Delta) ) )
+             => ( ( $greatereq($difference(f0(X),l10),0.0)
+                 => $less($difference(f0(X),l10),Epsilon) )
+                & ( ~ $greatereq($difference(f0(X),l10),0.0)
+                 => $less($uminus($difference(f0(X),l10)),Epsilon) ) ) ) ) ) ).
+
+%% âˆ€ epsilon:Real ((0.0 < epsilon) â‡’ âˆƒ delta:Real ((0.0 < delta) âˆ§ âˆ€ x:Real ((Â¬(x = l12) âˆ§ ((if ((x - l12) â‰¥ 0.0) (x - l12) else -(x - l12)) < delta)) â‡’ ((if ((f0(x) - l11) â‰¥ 0.0) (f0(x) - l11) else -(f0(x) - l11)) < epsilon))))
+tff(formula_12,axiom,
+    ! [Epsilon: $real] :
+      ( $less(0.0,Epsilon)
+     => ? [Delta: $real] :
+          ( $less(0.0,Delta)
+          & ! [X: $real] :
+              ( ( ( X != l12 )
+                & ( $greatereq($difference(X,l12),0.0)
+                 => $less($difference(X,l12),Delta) )
+                & ( ~ $greatereq($difference(X,l12),0.0)
+                 => $less($uminus($difference(X,l12)),Delta) ) )
+             => ( ( $greatereq($difference(f0(X),l11),0.0)
+                 => $less($difference(f0(X),l11),Epsilon) )
+                & ( ~ $greatereq($difference(f0(X),l11),0.0)
+                 => $less($uminus($difference(f0(X),l11)),Epsilon) ) ) ) ) ) ).
+
+%% âˆ€ epsilon:Real ((0.0 < epsilon) â‡’ âˆƒ delta:Real ((0.0 < delta) âˆ§ âˆ€ x:Real ((Â¬(x = l13) âˆ§ ((if ((x - l13) â‰¥ 0.0) (x - l13) else -(x - l13)) < delta)) â‡’ ((if ((f1(x) - l12) â‰¥ 0.0) (f1(x) - l12) else -(f1(x) - l12)) < epsilon))))
+tff(formula_13,axiom,
+    ! [Epsilon: $real] :
+      ( $less(0.0,Epsilon)
+     => ? [Delta: $real] :
+          ( $less(0.0,Delta)
+          & ! [X: $real] :
+              ( ( ( X != l13 )
+                & ( $greatereq($difference(X,l13),0.0)
+                 => $less($difference(X,l13),Delta) )
+                & ( ~ $greatereq($difference(X,l13),0.0)
+                 => $less($uminus($difference(X,l13)),Delta) ) )
+             => ( ( $greatereq($difference(f1(X),l12),0.0)
+                 => $less($difference(f1(X),l12),Epsilon) )
+                & ( ~ $greatereq($difference(f1(X),l12),0.0)
+                 => $less($uminus($difference(f1(X),l12)),Epsilon) ) ) ) ) ) ).
+
+%% âˆ€ epsilon:Real ((0.0 < epsilon) â‡’ âˆƒ delta:Real ((0.0 < delta) âˆ§ âˆ€ x:Real ((Â¬(x = l14) âˆ§ ((if ((x - l14) â‰¥ 0.0) (x - l14) else -(x - l14)) < delta)) â‡’ ((if ((f0(x) - l13) â‰¥ 0.0) (f0(x) - l13) else -(f0(x) - l13)) < epsilon))))
+tff(formula_14,axiom,
+    ! [Epsilon: $real] :
+      ( $less(0.0,Epsilon)
+     => ? [Delta: $real] :
+          ( $less(0.0,Delta)
+          & ! [X: $real] :
+              ( ( ( X != l14 )
+                & ( $greatereq($difference(X,l14),0.0)
+                 => $less($difference(X,l14),Delta) )
+                & ( ~ $greatereq($difference(X,l14),0.0)
+                 => $less($uminus($difference(X,l14)),Delta) ) )
+             => ( ( $greatereq($difference(f0(X),l13),0.0)
+                 => $less($difference(f0(X),l13),Epsilon) )
+                & ( ~ $greatereq($difference(f0(X),l13),0.0)
+                 => $less($uminus($difference(f0(X),l13)),Epsilon) ) ) ) ) ) ).
+
+%% âˆ€ epsilon:Real ((0.0 < epsilon) â‡’ âˆƒ delta:Real ((0.0 < delta) âˆ§ âˆ€ x:Real ((Â¬(x = l15) âˆ§ ((if ((x - l15) â‰¥ 0.0) (x - l15) else -(x - l15)) < delta)) â‡’ ((if ((f0(x) - l14) â‰¥ 0.0) (f0(x) - l14) else -(f0(x) - l14)) < epsilon))))
+tff(formula_15,axiom,
+    ! [Epsilon: $real] :
+      ( $less(0.0,Epsilon)
+     => ? [Delta: $real] :
+          ( $less(0.0,Delta)
+          & ! [X: $real] :
+              ( ( ( X != l15 )
+                & ( $greatereq($difference(X,l15),0.0)
+                 => $less($difference(X,l15),Delta) )
+                & ( ~ $greatereq($difference(X,l15),0.0)
+                 => $less($uminus($difference(X,l15)),Delta) ) )
+             => ( ( $greatereq($difference(f0(X),l14),0.0)
+                 => $less($difference(f0(X),l14),Epsilon) )
+                & ( ~ $greatereq($difference(f0(X),l14),0.0)
+                 => $less($uminus($difference(f0(X),l14)),Epsilon) ) ) ) ) ) ).
+
+%% âˆ€ epsilon:Real ((0.0 < epsilon) â‡’ âˆƒ delta:Real ((0.0 < delta) âˆ§ âˆ€ x:Real ((Â¬(x = l16) âˆ§ ((if ((x - l16) â‰¥ 0.0) (x - l16) else -(x - l16)) < delta)) â‡’ ((if ((f0(x) - l15) â‰¥ 0.0) (f0(x) - l15) else -(f0(x) - l15)) < epsilon))))
+tff(formula_16,axiom,
+    ! [Epsilon: $real] :
+      ( $less(0.0,Epsilon)
+     => ? [Delta: $real] :
+          ( $less(0.0,Delta)
+          & ! [X: $real] :
+              ( ( ( X != l16 )
+                & ( $greatereq($difference(X,l16),0.0)
+                 => $less($difference(X,l16),Delta) )
+                & ( ~ $greatereq($difference(X,l16),0.0)
+                 => $less($uminus($difference(X,l16)),Delta) ) )
+             => ( ( $greatereq($difference(f0(X),l15),0.0)
+                 => $less($difference(f0(X),l15),Epsilon) )
+                & ( ~ $greatereq($difference(f0(X),l15),0.0)
+                 => $less($uminus($difference(f0(X),l15)),Epsilon) ) ) ) ) ) ).
+
+%% âˆ€ epsilon:Real ((0.0 < epsilon) â‡’ âˆƒ delta:Real ((0.0 < delta) âˆ§ âˆ€ x:Real ((Â¬(x = l17) âˆ§ ((if ((x - l17) â‰¥ 0.0) (x - l17) else -(x - l17)) < delta)) â‡’ ((if ((f1(x) - l16) â‰¥ 0.0) (f1(x) - l16) else -(f1(x) - l16)) < epsilon))))
+tff(formula_17,axiom,
+    ! [Epsilon: $real] :
+      ( $less(0.0,Epsilon)
+     => ? [Delta: $real] :
+          ( $less(0.0,Delta)
+          & ! [X: $real] :
+              ( ( ( X != l17 )
+                & ( $greatereq($difference(X,l17),0.0)
+                 => $less($difference(X,l17),Delta) )
+                & ( ~ $greatereq($difference(X,l17),0.0)
+                 => $less($uminus($difference(X,l17)),Delta) ) )
+             => ( ( $greatereq($difference(f1(X),l16),0.0)
+                 => $less($difference(f1(X),l16),Epsilon) )
+                & ( ~ $greatereq($difference(f1(X),l16),0.0)
+                 => $less($uminus($difference(f1(X),l16)),Epsilon) ) ) ) ) ) ).
+
+%% âˆ€ epsilon:Real ((0.0 < epsilon) â‡’ âˆƒ delta:Real ((0.0 < delta) âˆ§ âˆ€ x:Real ((Â¬(x = l18) âˆ§ ((if ((x - l18) â‰¥ 0.0) (x - l18) else -(x - l18)) < delta)) â‡’ ((if ((f0(x) - l17) â‰¥ 0.0) (f0(x) - l17) else -(f0(x) - l17)) < epsilon))))
+tff(formula_18,axiom,
+    ! [Epsilon: $real] :
+      ( $less(0.0,Epsilon)
+     => ? [Delta: $real] :
+          ( $less(0.0,Delta)
+          & ! [X: $real] :
+              ( ( ( X != l18 )
+                & ( $greatereq($difference(X,l18),0.0)
+                 => $less($difference(X,l18),Delta) )
+                & ( ~ $greatereq($difference(X,l18),0.0)
+                 => $less($uminus($difference(X,l18)),Delta) ) )
+             => ( ( $greatereq($difference(f0(X),l17),0.0)
+                 => $less($difference(f0(X),l17),Epsilon) )
+                & ( ~ $greatereq($difference(f0(X),l17),0.0)
+                 => $less($uminus($difference(f0(X),l17)),Epsilon) ) ) ) ) ) ).
+
+%% âˆ€ epsilon:Real ((0.0 < epsilon) â‡’ âˆƒ delta:Real ((0.0 < delta) âˆ§ âˆ€ x:Real ((Â¬(x = l19) âˆ§ ((if ((x - l19) â‰¥ 0.0) (x - l19) else -(x - l19)) < delta)) â‡’ ((if ((f1(x) - l18) â‰¥ 0.0) (f1(x) - l18) else -(f1(x) - l18)) < epsilon))))
+tff(formula_19,axiom,
+    ! [Epsilon: $real] :
+      ( $less(0.0,Epsilon)
+     => ? [Delta: $real] :
+          ( $less(0.0,Delta)
+          & ! [X: $real] :
+              ( ( ( X != l19 )
+                & ( $greatereq($difference(X,l19),0.0)
+                 => $less($difference(X,l19),Delta) )
+                & ( ~ $greatereq($difference(X,l19),0.0)
+                 => $less($uminus($difference(X,l19)),Delta) ) )
+             => ( ( $greatereq($difference(f1(X),l18),0.0)
+                 => $less($difference(f1(X),l18),Epsilon) )
+                & ( ~ $greatereq($difference(f1(X),l18),0.0)
+                 => $less($uminus($difference(f1(X),l18)),Epsilon) ) ) ) ) ) ).
+
+%% âˆ€ epsilon:Real ((0.0 < epsilon) â‡’ âˆƒ delta:Real ((0.0 < delta) âˆ§ âˆ€ x:Real ((Â¬(x = l20) âˆ§ ((if ((x - l20) â‰¥ 0.0) (x - l20) else -(x - l20)) < delta)) â‡’ ((if ((f0(x) - l19) â‰¥ 0.0) (f0(x) - l19) else -(f0(x) - l19)) < epsilon))))
+tff(formula_20,axiom,
+    ! [Epsilon: $real] :
+      ( $less(0.0,Epsilon)
+     => ? [Delta: $real] :
+          ( $less(0.0,Delta)
+          & ! [X: $real] :
+              ( ( ( X != l20 )
+                & ( $greatereq($difference(X,l20),0.0)
+                 => $less($difference(X,l20),Delta) )
+                & ( ~ $greatereq($difference(X,l20),0.0)
+                 => $less($uminus($difference(X,l20)),Delta) ) )
+             => ( ( $greatereq($difference(f0(X),l19),0.0)
+                 => $less($difference(f0(X),l19),Epsilon) )
+                & ( ~ $greatereq($difference(f0(X),l19),0.0)
+                 => $less($uminus($difference(f0(X),l19)),Epsilon) ) ) ) ) ) ).
+
+%% âˆ€ epsilon:Real ((0.0 < epsilon) â‡’ âˆƒ delta:Real ((0.0 < delta) âˆ§ âˆ€ x:Real ((Â¬(x = l21) âˆ§ ((if ((x - l21) â‰¥ 0.0) (x - l21) else -(x - l21)) < delta)) â‡’ ((if ((f1(x) - l20) â‰¥ 0.0) (f1(x) - l20) else -(f1(x) - l20)) < epsilon))))
+tff(formula_21,axiom,
+    ! [Epsilon: $real] :
+      ( $less(0.0,Epsilon)
+     => ? [Delta: $real] :
+          ( $less(0.0,Delta)
+          & ! [X: $real] :
+              ( ( ( X != l21 )
+                & ( $greatereq($difference(X,l21),0.0)
+                 => $less($difference(X,l21),Delta) )
+                & ( ~ $greatereq($difference(X,l21),0.0)
+                 => $less($uminus($difference(X,l21)),Delta) ) )
+             => ( ( $greatereq($difference(f1(X),l20),0.0)
+                 => $less($difference(f1(X),l20),Epsilon) )
+                & ( ~ $greatereq($difference(f1(X),l20),0.0)
+                 => $less($uminus($difference(f1(X),l20)),Epsilon) ) ) ) ) ) ).
+
+%% âˆ€ epsilon:Real ((0.0 < epsilon) â‡’ âˆƒ delta:Real ((0.0 < delta) âˆ§ âˆ€ x:Real ((Â¬(x = l22) âˆ§ ((if ((x - l22) â‰¥ 0.0) (x - l22) else -(x - l22)) < delta)) â‡’ ((if ((f0(x) - l21) â‰¥ 0.0) (f0(x) - l21) else -(f0(x) - l21)) < epsilon))))
+tff(formula_22,axiom,
+    ! [Epsilon: $real] :
+      ( $less(0.0,Epsilon)
+     => ? [Delta: $real] :
+          ( $less(0.0,Delta)
+          & ! [X: $real] :
+              ( ( ( X != l22 )
+                & ( $greatereq($difference(X,l22),0.0)
+                 => $less($difference(X,l22),Delta) )
+                & ( ~ $greatereq($difference(X,l22),0.0)
+                 => $less($uminus($difference(X,l22)),Delta) ) )
+             => ( ( $greatereq($difference(f0(X),l21),0.0)
+                 => $less($difference(f0(X),l21),Epsilon) )
+                & ( ~ $greatereq($difference(f0(X),l21),0.0)
+                 => $less($uminus($difference(f0(X),l21)),Epsilon) ) ) ) ) ) ).
+
+%% âˆ€ epsilon:Real ((0.0 < epsilon) â‡’ âˆƒ delta:Real ((0.0 < delta) âˆ§ âˆ€ x:Real ((Â¬(x = l23) âˆ§ ((if ((x - l23) â‰¥ 0.0) (x - l23) else -(x - l23)) < delta)) â‡’ ((if ((f1(x) - l22) â‰¥ 0.0) (f1(x) - l22) else -(f1(x) - l22)) < epsilon))))
+tff(formula_23,axiom,
+    ! [Epsilon: $real] :
+      ( $less(0.0,Epsilon)
+     => ? [Delta: $real] :
+          ( $less(0.0,Delta)
+          & ! [X: $real] :
+              ( ( ( X != l23 )
+                & ( $greatereq($difference(X,l23),0.0)
+                 => $less($difference(X,l23),Delta) )
+                & ( ~ $greatereq($difference(X,l23),0.0)
+                 => $less($uminus($difference(X,l23)),Delta) ) )
+             => ( ( $greatereq($difference(f1(X),l22),0.0)
+                 => $less($difference(f1(X),l22),Epsilon) )
+                & ( ~ $greatereq($difference(f1(X),l22),0.0)
+                 => $less($uminus($difference(f1(X),l22)),Epsilon) ) ) ) ) ) ).
+
+%% âˆ€ epsilon:Real ((0.0 < epsilon) â‡’ âˆƒ delta:Real ((0.0 < delta) âˆ§ âˆ€ x:Real ((Â¬(x = l24) âˆ§ ((if ((x - l24) â‰¥ 0.0) (x - l24) else -(x - l24)) < delta)) â‡’ ((if ((f1(x) - l23) â‰¥ 0.0) (f1(x) - l23) else -(f1(x) - l23)) < epsilon))))
+tff(formula_24,axiom,
+    ! [Epsilon: $real] :
+      ( $less(0.0,Epsilon)
+     => ? [Delta: $real] :
+          ( $less(0.0,Delta)
+          & ! [X: $real] :
+              ( ( ( X != l24 )
+                & ( $greatereq($difference(X,l24),0.0)
+                 => $less($difference(X,l24),Delta) )
+                & ( ~ $greatereq($difference(X,l24),0.0)
+                 => $less($uminus($difference(X,l24)),Delta) ) )
+             => ( ( $greatereq($difference(f1(X),l23),0.0)
+                 => $less($difference(f1(X),l23),Epsilon) )
+                & ( ~ $greatereq($difference(f1(X),l23),0.0)
+                 => $less($uminus($difference(f1(X),l23)),Epsilon) ) ) ) ) ) ).
+
+%% âˆ€ epsilon:Real ((0.0 < epsilon) â‡’ âˆƒ delta:Real ((0.0 < delta) âˆ§ âˆ€ x:Real ((Â¬(x = l25) âˆ§ ((if ((x - l25) â‰¥ 0.0) (x - l25) else -(x - l25)) < delta)) â‡’ ((if ((f1(x) - l24) â‰¥ 0.0) (f1(x) - l24) else -(f1(x) - l24)) < epsilon))))
+tff(formula_25,axiom,
+    ! [Epsilon: $real] :
+      ( $less(0.0,Epsilon)
+     => ? [Delta: $real] :
+          ( $less(0.0,Delta)
+          & ! [X: $real] :
+              ( ( ( X != l25 )
+                & ( $greatereq($difference(X,l25),0.0)
+                 => $less($difference(X,l25),Delta) )
+                & ( ~ $greatereq($difference(X,l25),0.0)
+                 => $less($uminus($difference(X,l25)),Delta) ) )
+             => ( ( $greatereq($difference(f1(X),l24),0.0)
+                 => $less($difference(f1(X),l24),Epsilon) )
+                & ( ~ $greatereq($difference(f1(X),l24),0.0)
+                 => $less($uminus($difference(f1(X),l24)),Epsilon) ) ) ) ) ) ).
+
+%% âˆ€ epsilon:Real ((0.0 < epsilon) â‡’ âˆƒ delta:Real ((0.0 < delta) âˆ§ âˆ€ x:Real ((Â¬(x = l26) âˆ§ ((if ((x - l26) â‰¥ 0.0) (x - l26) else -(x - l26)) < delta)) â‡’ ((if ((f0(x) - l25) â‰¥ 0.0) (f0(x) - l25) else -(f0(x) - l25)) < epsilon))))
+tff(formula_26,axiom,
+    ! [Epsilon: $real] :
+      ( $less(0.0,Epsilon)
+     => ? [Delta: $real] :
+          ( $less(0.0,Delta)
+          & ! [X: $real] :
+              ( ( ( X != l26 )
+                & ( $greatereq($difference(X,l26),0.0)
+                 => $less($difference(X,l26),Delta) )
+                & ( ~ $greatereq($difference(X,l26),0.0)
+                 => $less($uminus($difference(X,l26)),Delta) ) )
+             => ( ( $greatereq($difference(f0(X),l25),0.0)
+                 => $less($difference(f0(X),l25),Epsilon) )
+                & ( ~ $greatereq($difference(f0(X),l25),0.0)
+                 => $less($uminus($difference(f0(X),l25)),Epsilon) ) ) ) ) ) ).
+
+%% âˆ€ epsilon:Real ((0.0 < epsilon) â‡’ âˆƒ delta:Real ((0.0 < delta) âˆ§ âˆ€ x:Real ((Â¬(x = l27) âˆ§ ((if ((x - l27) â‰¥ 0.0) (x - l27) else -(x - l27)) < delta)) â‡’ ((if ((f0(x) - l26) â‰¥ 0.0) (f0(x) - l26) else -(f0(x) - l26)) < epsilon))))
+tff(formula_27,axiom,
+    ! [Epsilon: $real] :
+      ( $less(0.0,Epsilon)
+     => ? [Delta: $real] :
+          ( $less(0.0,Delta)
+          & ! [X: $real] :
+              ( ( ( X != l27 )
+                & ( $greatereq($difference(X,l27),0.0)
+                 => $less($difference(X,l27),Delta) )
+                & ( ~ $greatereq($difference(X,l27),0.0)
+                 => $less($uminus($difference(X,l27)),Delta) ) )
+             => ( ( $greatereq($difference(f0(X),l26),0.0)
+                 => $less($difference(f0(X),l26),Epsilon) )
+                & ( ~ $greatereq($difference(f0(X),l26),0.0)
+                 => $less($uminus($difference(f0(X),l26)),Epsilon) ) ) ) ) ) ).
+
+%% âˆ€ epsilon:Real ((0.0 < epsilon) â‡’ âˆƒ delta:Real ((0.0 < delta) âˆ§ âˆ€ x:Real ((Â¬(x = l28) âˆ§ ((if ((x - l28) â‰¥ 0.0) (x - l28) else -(x - l28)) < delta)) â‡’ ((if ((f0(x) - l27) â‰¥ 0.0) (f0(x) - l27) else -(f0(x) - l27)) < epsilon))))
+tff(formula_28,axiom,
+    ! [Epsilon: $real] :
+      ( $less(0.0,Epsilon)
+     => ? [Delta: $real] :
+          ( $less(0.0,Delta)
+          & ! [X: $real] :
+              ( ( ( X != l28 )
+                & ( $greatereq($difference(X,l28),0.0)
+                 => $less($difference(X,l28),Delta) )
+                & ( ~ $greatereq($difference(X,l28),0.0)
+                 => $less($uminus($difference(X,l28)),Delta) ) )
+             => ( ( $greatereq($difference(f0(X),l27),0.0)
+                 => $less($difference(f0(X),l27),Epsilon) )
+                & ( ~ $greatereq($difference(f0(X),l27),0.0)
+                 => $less($uminus($difference(f0(X),l27)),Epsilon) ) ) ) ) ) ).
+
+%% âˆ€ epsilon:Real ((0.0 < epsilon) â‡’ âˆƒ delta:Real ((0.0 < delta) âˆ§ âˆ€ x:Real ((Â¬(x = l29) âˆ§ ((if ((x - l29) â‰¥ 0.0) (x - l29) else -(x - l29)) < delta)) â‡’ ((if ((f1(x) - l28) â‰¥ 0.0) (f1(x) - l28) else -(f1(x) - l28)) < epsilon))))
+tff(formula_29,axiom,
+    ! [Epsilon: $real] :
+      ( $less(0.0,Epsilon)
+     => ? [Delta: $real] :
+          ( $less(0.0,Delta)
+          & ! [X: $real] :
+              ( ( ( X != l29 )
+                & ( $greatereq($difference(X,l29),0.0)
+                 => $less($difference(X,l29),Delta) )
+                & ( ~ $greatereq($difference(X,l29),0.0)
+                 => $less($uminus($difference(X,l29)),Delta) ) )
+             => ( ( $greatereq($difference(f1(X),l28),0.0)
+                 => $less($difference(f1(X),l28),Epsilon) )
+                & ( ~ $greatereq($difference(f1(X),l28),0.0)
+                 => $less($uminus($difference(f1(X),l28)),Epsilon) ) ) ) ) ) ).
+
+%% âˆ€ epsilon:Real ((0.0 < epsilon) â‡’ âˆƒ delta:Real ((0.0 < delta) âˆ§ âˆ€ x:Real ((Â¬(x = l30) âˆ§ ((if ((x - l30) â‰¥ 0.0) (x - l30) else -(x - l30)) < delta)) â‡’ ((if ((f0(x) - l29) â‰¥ 0.0) (f0(x) - l29) else -(f0(x) - l29)) < epsilon))))
+tff(formula_30,axiom,
+    ! [Epsilon: $real] :
+      ( $less(0.0,Epsilon)
+     => ? [Delta: $real] :
+          ( $less(0.0,Delta)
+          & ! [X: $real] :
+              ( ( ( X != l30 )
+                & ( $greatereq($difference(X,l30),0.0)
+                 => $less($difference(X,l30),Delta) )
+                & ( ~ $greatereq($difference(X,l30),0.0)
+                 => $less($uminus($difference(X,l30)),Delta) ) )
+             => ( ( $greatereq($difference(f0(X),l29),0.0)
+                 => $less($difference(f0(X),l29),Epsilon) )
+                & ( ~ $greatereq($difference(f0(X),l29),0.0)
+                 => $less($uminus($difference(f0(X),l29)),Epsilon) ) ) ) ) ) ).
+
+%% âˆ€ epsilon:Real ((0.0 < epsilon) â‡’ âˆƒ delta:Real ((0.0 < delta) âˆ§ âˆ€ x:Real ((Â¬(x = l31) âˆ§ ((if ((x - l31) â‰¥ 0.0) (x - l31) else -(x - l31)) < delta)) â‡’ ((if ((f0(x) - l30) â‰¥ 0.0) (f0(x) - l30) else -(f0(x) - l30)) < epsilon))))
+tff(formula_31,axiom,
+    ! [Epsilon: $real] :
+      ( $less(0.0,Epsilon)
+     => ? [Delta: $real] :
+          ( $less(0.0,Delta)
+          & ! [X: $real] :
+              ( ( ( X != l31 )
+                & ( $greatereq($difference(X,l31),0.0)
+                 => $less($difference(X,l31),Delta) )
+                & ( ~ $greatereq($difference(X,l31),0.0)
+                 => $less($uminus($difference(X,l31)),Delta) ) )
+             => ( ( $greatereq($difference(f0(X),l30),0.0)
+                 => $less($difference(f0(X),l30),Epsilon) )
+                & ( ~ $greatereq($difference(f0(X),l30),0.0)
+                 => $less($uminus($difference(f0(X),l30)),Epsilon) ) ) ) ) ) ).
+
+%% âˆ€ epsilon:Real ((0.0 < epsilon) â‡’ âˆƒ delta:Real ((0.0 < delta) âˆ§ âˆ€ x:Real ((Â¬(x = a) âˆ§ ((if ((x - a) â‰¥ 0.0) (x - a) else -(x - a)) < delta)) â‡’ ((if ((f0(x) - l31) â‰¥ 0.0) (f0(x) - l31) else -(f0(x) - l31)) < epsilon))))
+tff(formula_32,axiom,
+    ! [Epsilon: $real] :
+      ( $less(0.0,Epsilon)
+     => ? [Delta: $real] :
+          ( $less(0.0,Delta)
+          & ! [X: $real] :
+              ( ( ( X != a )
+                & ( $greatereq($difference(X,a),0.0)
+                 => $less($difference(X,a),Delta) )
+                & ( ~ $greatereq($difference(X,a),0.0)
+                 => $less($uminus($difference(X,a)),Delta) ) )
+             => ( ( $greatereq($difference(f0(X),l31),0.0)
+                 => $less($difference(f0(X),l31),Epsilon) )
+                & ( ~ $greatereq($difference(f0(X),l31),0.0)
+                 => $less($uminus($difference(f0(X),l31)),Epsilon) ) ) ) ) ) ).
+
+%% âˆ€ epsilon:Real ((0.0 < epsilon) â‡’ âˆƒ delta:Real ((0.0 < delta) âˆ§ âˆ€ x:Real ((Â¬(x = a) âˆ§ ((if ((x - a) â‰¥ 0.0) (x - a) else -(x - a)) < delta)) â‡’ ((if ((f1(f1(f0(f0(f0(f1(f0(f1(f1(f0(f0(f0(f1(f0(f0(f0(f1(f0(f1(f0(f1(f0(f1(f1(f1(f0(f0(f0(f1(f0(f0(f0(x)))))))))))))))))))))))))))))))) - l) â‰¥ 0.0) (f1(f1(f0(f0(f0(f1(f0(f1(f1(f0(f0(f0(f1(f0(f0(f0(f1(f0(f1(f0(f1(f0(f1(f1(f1(f0(f0(f0(f1(f0(f0(f0(x)))))))))))))))))))))))))))))))) - l) else -(f1(f1(f0(f0(f0(f1(f0(f1(f1(f0(f0(f0(f1(f0(f0(f0(f1(f0(f1(f0(f1(f0(f1(f1(f1(f0(f0(f0(f1(f0(f0(f0(x)))))))))))))))))))))))))))))))) - l)) < epsilon))))
+tff(formula_33,conjecture,
+    ! [Epsilon: $real] :
+      ( $less(0.0,Epsilon)
+     => ? [Delta: $real] :
+          ( $less(0.0,Delta)
+          & ! [X: $real] :
+              ( ( ( X != a )
+                & ( $greatereq($difference(X,a),0.0)
+                 => $less($difference(X,a),Delta) )
+                & ( ~ $greatereq($difference(X,a),0.0)
+                 => $less($uminus($difference(X,a)),Delta) ) )
+             => ( ( $greatereq($difference(f1(f1(f0(f0(f0(f1(f0(f1(f1(f0(f0(f0(f1(f0(f0(f0(f1(f0(f1(f0(f1(f0(f1(f1(f1(f0(f0(f0(f1(f0(f0(f0(X)))))))))))))))))))))))))))))))),l),0.0)
+                 => $less($difference(f1(f1(f0(f0(f0(f1(f0(f1(f1(f0(f0(f0(f1(f0(f0(f0(f1(f0(f1(f0(f1(f0(f1(f1(f1(f0(f0(f0(f1(f0(f0(f0(X)))))))))))))))))))))))))))))))),l),Epsilon) )
+                & ( ~ $greatereq($difference(f1(f1(f0(f0(f0(f1(f0(f1(f1(f0(f0(f0(f1(f0(f0(f0(f1(f0(f1(f0(f1(f0(f1(f1(f1(f0(f0(f0(f1(f0(f0(f0(X)))))))))))))))))))))))))))))))),l),0.0)
+                 => $less($uminus($difference(f1(f1(f0(f0(f0(f1(f0(f1(f1(f0(f0(f0(f1(f0(f0(f0(f1(f0(f1(f0(f1(f0(f1(f1(f1(f0(f0(f0(f1(f0(f0(f0(X)))))))))))))))))))))))))))))))),l)),Epsilon) ) ) ) ) ) ).
+
+%------------------------------------------------------------------------------
