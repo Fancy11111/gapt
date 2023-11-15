@@ -39,17 +39,24 @@ class TptpParser( val input: ParserInput ) extends Parser {
 
   def TPTP_file: Rule1[TptpFile] = rule { Ws ~ TPTP_input.* ~ EOI ~> ( TptpFile( _ ) ) }
 
-  private def TPTP_input = rule { annotated_formula | include }
+  // private def TPTP_input = rule { typedef_formula | annotated_formula | include }
+  private def TPTP_input = rule { typedef_formula | annotated_formula | include }
 
   private def annotated_formula = rule {
-    atomic_word ~ "(" ~ Ws ~ name ~ Comma ~ ( ( capture( "type" ) ~ Comma ~ typedef ) | ( formula_role ~ Comma ~ formula ) ) ~ annotations ~ ")." ~ Ws ~>
+    atomic_word ~ "(" ~ Ws ~ name ~ Comma ~ ( ( Ws ~ capture( "type" ) ~ Ws ~ Comma ~ typedef ) | ( formula_role ~ Comma ~ formula ) ) ~ annotations ~ ")." ~ Ws ~>
       ( AnnotatedFormula( _, _, _, _, _ ) )
   }
+
+  private def typedef_formula = rule {
+    atomic_word ~ "(" ~ Ws ~ name ~ Comma ~ Ws ~ capture( "type" ) ~ Ws ~ Comma ~ typedef ~ annotations ~ ")." ~ Ws ~>
+      ( AnnotatedFormula( _, _, _, _, _ ) )
+  }
+
   // TODO: maybe fix the list of possible roles to values defined in specs
   private def formula_role = rule { atomic_word }
   private def annotations = rule { ( Comma ~ general_term ).* }
 
-  private def typedef: Rule1[Formula] = rule { ( variable ~ ":" ~ Ws ~ name ) ~> ( ( a: FOLVar, b: String ) => Top() ) }
+  private def typedef: Rule1[Formula] = rule { ( Ws ~ lower_word ~ ":" ~ Ws ~ complex_type ) ~> ( ( a: Ty ) => Top() ) }
   // private def typedef: Rule1[Formula] = rule { (variable ~  ":" ~ Ws ~ name)  ~> ((b:String, a: FOLVar) => FOLAtom(a.name, a) ) }
 
   private def formula = rule { typed_logic_formula }
@@ -60,7 +67,7 @@ class TptpParser( val input: ParserInput ) extends Parser {
   private def and_formula_part = rule { ( "&" ~ Ws ~ unitary_formula ).+ ~> ( ( a: Formula, as: Seq[Formula] ) => And.leftAssociative( a +: as: _* ) ) }
   private def unitary_formula: Rule1[Formula] = rule { quantified_formula | unary_formula | atomic_formula | "(" ~ Ws ~ logic_formula ~ ")" ~ Ws }
   private def quantified_formula = rule { fol_quantifier ~ "[" ~ Ws ~ variable_list ~ "]" ~ Ws ~ ":" ~ Ws ~ unitary_formula ~> ( ( q: QuantifierHelper, vs, m ) => q.Block( vs, m ) ) }
-  private def variable_list = rule { ( variable ~ ( ":" ~ Ws ~ name ).? ~> ( ( a, b ) => a ) ).+.separatedBy( Comma ) }
+  private def variable_list = rule { ( ( typed_variable | variable ) ~> ( ( a: Var ) => a ) ).+.separatedBy( Comma ) }
   private def unary_formula = rule { "~" ~ Ws ~ unitary_formula ~> ( Neg( _ ) ) }
 
   private def atomic_formula = rule { defined_prop | infix_formula | plain_atomic_formula | ( distinct_object ~> ( FOLAtom( _ ) ) ) }
@@ -80,6 +87,7 @@ class TptpParser( val input: ParserInput ) extends Parser {
 
   private def term: Rule1[Expr] = rule { variable | ( distinct_object ~> ( FOLConst( _ ) ) ) | ( number ~> ( FOLConst( _ ) ) ) | function_term }
   private def function_term = rule { name ~ ( "(" ~ Ws ~ term.+.separatedBy( Comma ) ~ ")" ~ Ws ).? ~> ( ( hd, as ) => TptpTerm( hd, as.getOrElse( Seq() ) ) ) }
+  private def typed_variable = rule { capture( upper_word ) ~ Ws ~ ":" ~ Ws ~ basic_type ~> ( Var( _, _ ) ) }
   private def variable = rule { capture( upper_word ) ~ Ws ~> ( FOLVar( _: String ) ) }
   private def arguments = rule { term.+.separatedBy( Comma ) }
 
@@ -129,7 +137,9 @@ class TptpParser( val input: ParserInput ) extends Parser {
   private val sg_char_pred = CharPredicate( ' ' to '&', '(' to '[', ']' to '~' )
   private def sg_char = rule { capture( sg_char_pred ) | ( "\\\\" ~ push( "\\" ) ) | ( "\\'" ~ push( "'" ) ) }
 
-  private def complex_type = rule { basic_type | ( ">" ~ push( ( t1: Ty, t2: Ty ) => t1 -> t2 ) ) }
+  private def complex_type: Rule1[Ty] = rule { ( basic_type ~ !( Ws ~ ">" ) ) | mapping_type }
+  private def mapping_type = rule { basic_type ~ Ws ~ ">" ~ Ws ~ complex_type ~> ( ( t1, t2 ) => expr.ty.TArr( t1, t2 ) ) }
+  // private def product_type = rule { root_type ~ ""}
   private def basic_type = rule {
     atomic_word ~> ( name =>
       name match {

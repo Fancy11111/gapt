@@ -16,7 +16,7 @@
 %            - 32 number of function applications
 
 % Refs     : [Sch22] Schoisswohl (2022), Email to G. Sutcliffe
-%          : [[KK+23](https://tptp.org/cgi-bin/SeeTPTP?Category=BibTeX&File=KK+23)] Korovin et al. (2023), ALASCA: Reasoning in Quantified
+%          : [KK+23] Korovin et al. (2023), ALASCA: Reasoning in Quantified
 % Source   : [Sch22]
 % Names    : composition_tower_f2_sz32__1.smt2 [Sch22]
 
@@ -31,8 +31,8 @@
 %            Maximal term depth    :   35 (   3 avg)
 %            Number arithmetic     :  957 ( 330 atm; 330 fun; 198 num;  99 var)
 %            Number of types       :    1 (   0 usr;   1 ari)
-%            Number of type conns  :    2 (   2   >;   0   *;   0   +;   0  <<)
 %            Number of predicates  :    3 (   0 usr;   0 prp; 2-2 aty)
+%            Number of type conns  :    2 (   2   >;   0   *;   0   +;   0  <<)
 %            Number of functors    :   38 (  35 usr;  34 con; 0-2 aty)
 %            Number of variables   :   99 (  66   !;  33   ?;  99   :)
 % SPC      : TF0_THM_EQU_ARI
@@ -40,6 +40,111 @@
 % Comments : Translated from SMT UFLRA by SMTtoTPTP.
 %------------------------------------------------------------------------------
 %% Declarations:
+tff(l14,type,
+    l14: $real ).
+
+tff(l4,type,
+    l4: $real ).
+
+tff(l5,type,
+    l5: $real ).
+
+tff(l30,type,
+    l30: $real ).
+
+tff(f0,type,
+    f0: $real > $real ).
+
+tff(l31,type,
+    l31: $real ).
+
+tff(l16,type,
+    l16: $real ).
+
+tff(l18,type,
+    l18: $real ).
+
+tff(l24,type,
+    l24: $real ).
+
+tff(l20,type,
+    l20: $real ).
+
+tff(l21,type,
+    l21: $real ).
+
+tff(l2,type,
+    l2: $real ).
+
+tff(a,type,
+    a: $real ).
+
+tff(l15,type,
+    l15: $real ).
+
+tff(l25,type,
+    l25: $real ).
+
+tff(f1,type,
+    f1: $real > $real ).
+
+tff(l27,type,
+    l27: $real ).
+
+tff(l10,type,
+    l10: $real ).
+
+tff(l1,type,
+    l1: $real ).
+
+tff(l13,type,
+    l13: $real ).
+
+tff(l26,type,
+    l26: $real ).
+
+tff(l19,type,
+    l19: $real ).
+
+tff(l23,type,
+    l23: $real ).
+
+tff(l28,type,
+    l28: $real ).
+
+tff(l11,type,
+    l11: $real ).
+
+tff(l7,type,
+    l7: $real ).
+
+tff(l17,type,
+    l17: $real ).
+
+tff(l,type,
+    l: $real ).
+
+tff(l29,type,
+    l29: $real ).
+
+tff(l22,type,
+    l22: $real ).
+
+tff(l9,type,
+    l9: $real ).
+
+tff(l3,type,
+    l3: $real ).
+
+tff(l12,type,
+    l12: $real ).
+
+tff(l8,type,
+    l8: $real ).
+
+tff(l6,type,
+    l6: $real ).
+
 %% Assertions:
 %% âˆ€ epsilon:Real ((0.0 < epsilon) â‡’ âˆƒ delta:Real ((0.0 < delta) âˆ§ âˆ€ x:Real ((Â¬(x = l1) âˆ§ ((if ((x - l1) â‰¥ 0.0) (x - l1) else -(x - l1)) < delta)) â‡’ ((if ((f1(x) - l) â‰¥ 0.0) (f1(x) - l) else -(f1(x) - l)) < epsilon))))
 tff(formula_1,axiom,
