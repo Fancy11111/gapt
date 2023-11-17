@@ -24,6 +24,7 @@ import gapt.expr.ty.To
 import gapt.expr.ty.Ty
 
 import scala.util.{ Failure, Success }
+import gapt.formats.tptp.GeneralTerm
 
 class TptpParser( val input: ParserInput ) extends Parser {
   import CharPredicate._
@@ -43,13 +44,13 @@ class TptpParser( val input: ParserInput ) extends Parser {
   private def TPTP_input = rule { typedef_formula | annotated_formula | include }
 
   private def annotated_formula = rule {
-    atomic_word ~ "(" ~ Ws ~ name ~ Comma ~ ( ( Ws ~ capture( "type" ) ~ Ws ~ Comma ~ typedef ) | ( formula_role ~ Comma ~ formula ) ) ~ annotations ~ ")." ~ Ws ~>
+    atomic_word ~ "(" ~ Ws ~ name ~ Comma ~ ( formula_role ~ Comma ~ formula ) ~ annotations ~ ")." ~ Ws ~>
       ( AnnotatedFormula( _, _, _, _, _ ) )
   }
 
-  private def typedef_formula = rule {
-    atomic_word ~ "(" ~ Ws ~ name ~ Comma ~ Ws ~ capture( "type" ) ~ Ws ~ Comma ~ typedef ~ annotations ~ ")." ~ Ws ~>
-      ( AnnotatedFormula( _, _, _, _, _ ) )
+  private def typedef_formula: Rule1[Typedef] = rule {
+    atomic_word ~ "(" ~ Ws ~ name ~ Comma ~ Ws ~ "type" ~ Ws ~ Comma ~ Ws ~ atomic_word ~ Ws ~ ":" ~ Ws ~ complex_type ~ annotations ~ ")." ~ Ws ~>
+      ( ( l: String, n: String, tn: String, t: Ty, a: Seq[GeneralTerm] ) => Typedef( l, n, tn, t, a ) )
   }
 
   // TODO: maybe fix the list of possible roles to values defined in specs
