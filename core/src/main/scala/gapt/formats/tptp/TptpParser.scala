@@ -50,7 +50,7 @@ class TptpParser( val input: ParserInput ) extends Parser {
 
   private def typedef_formula: Rule1[Typedef] = rule {
     atomic_word ~ "(" ~ Ws ~ name ~ Comma ~ Ws ~ "type" ~ Ws ~ Comma ~ Ws ~ atomic_word ~ Ws ~ ":" ~ Ws ~ complex_type ~ annotations ~ ")." ~ Ws ~>
-      ( ( l: String, n: String, tn: String, t: Ty, a: Seq[GeneralTerm] ) => Typedef( l, n, tn, t, a ) )
+      ( Typedef( _, _, _, _, _ ) )
   }
 
   // TODO: maybe fix the list of possible roles to values defined in specs

@@ -5,7 +5,7 @@ import org.specs2.mutable.Specification
 
 class TptpParserTest extends Specification {
 
-  def loadTPTP( fileName: String ) =
+  def loadTPTP( fileName: String ): TptpFile =
     resolveIncludes(
       TptpFile( Seq( IncludeDirective( fileName, None ) ) ),
       fileName => TptpImporter.loadWithoutIncludes( ClasspathInputFile( fileName ) ) )
@@ -22,6 +22,9 @@ class TptpParserTest extends Specification {
 
   "tffProblem" in {
     loadTPTP( "ANA134_1.002.032.p" )
+    // loadTPTP( "ANA134_1.002.032.p" ).inputs.foreach( v => print( TptpToString.tptpInput( v ) ) )
+    // TptpTypeChecker.extractTypes( loadTPTP( "ANA134_1.002.032.p" ) ).foreach( println( _ ) )
+    // TptpTypeChecker.topLevelTypes( loadTPTP( "ANA134_1.002.032.p" ) ).foreach( println( _ ) )
     ok
   }
 }
