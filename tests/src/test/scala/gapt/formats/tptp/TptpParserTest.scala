@@ -2,6 +2,10 @@ package gapt.formats.tptp
 
 import gapt.formats.ClasspathInputFile
 import org.specs2.mutable.Specification
+import java.nio.file.Files
+import java.nio.file.Path
+import java.nio.file.Paths
+import scala.jdk.CollectionConverters._
 
 class TptpParserTest extends Specification {
 
@@ -20,11 +24,16 @@ class TptpParserTest extends Specification {
     ok
   }
 
-  "tffProblem" in {
-    loadTPTP( "ANA134_1.002.032.p" )
+  "tffProblems" should {
+    ok
+    // loadTPTP( "ANA134_1.002.032.p" )
     // loadTPTP( "ANA134_1.002.032.p" ).inputs.foreach( v => print( TptpToString.tptpInput( v ) ) )
     // TptpTypeChecker.extractTypes( loadTPTP( "ANA134_1.002.032.p" ) ).foreach( println( _ ) )
     // TptpTypeChecker.topLevelTypes( loadTPTP( "ANA134_1.002.032.p" ) ).foreach( println( _ ) )
-    ok
-  }
+  }.prepend( Files.newDirectoryStream( Paths.get( getClass.getResource( "/tff-problems" ).toURI() ) ).iterator.asScala.map( p => {
+    "load " + p.getFileName.toString in {
+      loadTPTP( "tff-problems/" + p.getFileName().toString() )
+      ok
+    }
+  } ).toSeq )
 }

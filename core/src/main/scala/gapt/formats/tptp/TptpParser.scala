@@ -26,6 +26,36 @@ import gapt.expr.ty.Ty
 import scala.util.{ Failure, Success }
 import gapt.formats.tptp.GeneralTerm
 
+class Ctx(val vars: Map[String, Var], val types: Map[String, Ty]) {
+
+}
+
+object Ctx {
+  def unapply(ctx: Ctx): Option[Tuple2[Map[String, Var], Map[String,Ty]]] = {
+    Some((ctx.vars, ctx.types))
+  }
+
+  def apply(vars: Map[String, Var], types: Map[String, Ty]): Ctx = {
+    new Ctx(vars, types) 
+  }
+  
+  def apply(ctx: Ctx, name: String, v: Var) : Ctx = {
+    ctx match {
+      case Ctx(vars,types) => {
+        Ctx(vars + (name -> v), types)
+      }
+    } 
+  }
+
+  def apply(ctx: Ctx, name: String, t: Ty) : Ctx = {
+    ctx match {
+      case Ctx(vars,types) => {
+        Ctx(vars, types + (name -> t))
+      }
+    } 
+  }
+}
+
 class TptpParser( val input: ParserInput ) extends Parser {
   import CharPredicate._
 
@@ -60,7 +90,7 @@ class TptpParser( val input: ParserInput ) extends Parser {
   private def typedef: Rule1[Formula] = rule { ( Ws ~ lower_word ~ ":" ~ Ws ~ complex_type ) ~> ( ( a: Ty ) => Top() ) }
   // private def typedef: Rule1[Formula] = rule { (variable ~  ":" ~ Ws ~ name)  ~> ((b:String, a: FOLVar) => FOLAtom(a.name, a) ) }
 
-  private def formula = rule { typed_logic_formula }
+  private def formula = rule {  typed_logic_formula }
   private def typed_logic_formula = rule { logic_formula } //add type annotation
   private def logic_formula: Rule1[Formula] = rule { unitary_formula ~ ( binary_nonassoc_part | or_formula_part | and_formula_part ).? }
   private def binary_nonassoc_part = rule { binary_connective ~ unitary_formula ~> ( ( a: Formula, c: ( Expr, Expr ) => Formula, b: Formula ) => c( a, b ) ) }
@@ -138,8 +168,9 @@ class TptpParser( val input: ParserInput ) extends Parser {
   private val sg_char_pred = CharPredicate( ' ' to '&', '(' to '[', ']' to '~' )
   private def sg_char = rule { capture( sg_char_pred ) | ( "\\\\" ~ push( "\\" ) ) | ( "\\'" ~ push( "'" ) ) }
 
-  private def complex_type: Rule1[Ty] = rule { ( basic_type ~ !( Ws ~ ">" ) ) | mapping_type }
-  private def mapping_type = rule { basic_type ~ Ws ~ ">" ~ Ws ~ complex_type ~> ( ( t1, t2 ) => expr.ty.TArr( t1, t2 ) ) }
+  private def complex_type: Rule1[Ty] = rule { ( basic_type ~ !( Ws ~ ( ">" | "*" ) ) ) | mapping_type | product_type }
+  private def mapping_type = rule { ( basic_type | ( "(" ~ Ws ~ product_type ~ Ws ~ ")" ) ) ~ Ws ~ ">" ~ Ws ~ complex_type ~> ( expr.ty.TArr ) }
+  private def product_type = rule { basic_type ~ Ws ~ "*" ~ Ws ~ complex_type ~> ( expr.ty.TArr ) }
   // private def product_type = rule { root_type ~ ""}
   private def basic_type = rule {
     atomic_word ~> ( name =>

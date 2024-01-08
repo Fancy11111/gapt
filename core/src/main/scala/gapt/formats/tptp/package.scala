@@ -25,7 +25,7 @@ package object tptp {
         Sequent() :+ formula
       case AnnotatedFormula( _, _, _, formula, _ ) =>
         formula +: Sequent()
-      case Typedef( _, _, _, _, _ ) =>
+      case Typedef(_, _, _, _, _ ) =>
         Sequent()
       case in => throw new IllegalArgumentException( in.toString )
     } )
@@ -38,7 +38,7 @@ package object tptp {
           formula +: Sequent()
         case IncludeDirective( _, _ ) =>
           Sequent()
-        case Typedef( _, _, _, _, _ ) =>
+        case Typedef(_, _, _, _, _ ) =>
           Sequent()
       } )
       val names = inputs.collect( {
