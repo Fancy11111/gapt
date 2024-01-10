@@ -29,6 +29,11 @@ import gapt.formats.tptp.GeneralTerm
 class Ctx( val vars: Map[String, Var], val types: Map[String, Ty] ) {
 
 }
+//
+
+// trait CtxTo[A] {
+//   def apply(ctx: Ctx): A
+// }
 
 object Ctx {
   def unapply( ctx: Ctx ): Option[Tuple2[Map[String, Var], Map[String, Ty]]] = {
@@ -58,6 +63,8 @@ object Ctx {
 
 class TptpParser( val input: ParserInput ) extends Parser {
   import CharPredicate._
+
+  type CtxTo[A] = Ctx => A
 
   private def Ws = rule {
     quiet( zeroOrMore( anyOf( " \t \n" ) |
@@ -144,27 +151,25 @@ class TptpParser( val input: ParserInput ) extends Parser {
   // ==========
   // tff
   // ==========
-  private def tff_formula = rule { tff_typed_logic_formula }
-  private def tff_typed_logic_formula = rule { tff_logic_formula } //add type annotation
+  // private def tff_formula = rule { tff_typed_logic_formula }
+  // private def tff_typed_logic_formula = rule { tff_logic_formula } //add type annotation
+  //
+  // private def tff_logic_formula: Rule1[Formula] = rule { tff_unitary_formula ~ ( tff_binary_nonassoc_part | tff_or_formula_part | tff_and_formula_part ).? }
+  // private def tff_binary_nonassoc_part = rule { binary_connective ~ tff_unitary_formula ~> ( ( a: Formula, c: ( Expr, Expr ) => Formula, b: Formula ) => c( a, b ) ) }
+  // private def tff_or_formula_part = rule { ( "|" ~ Ws ~ tff_unitary_formula ).+ ~> ( ( a: Formula, as: Seq[Formula] ) => Or.leftAssociative( a +: as: _* ) ) }
+  // private def tff_and_formula_part = rule { ( "&" ~ Ws ~ tff_unitary_formula ).+ ~> ( ( a: Formula, as: Seq[Formula] ) => And.leftAssociative( a +: as: _* ) ) }
+  // private def tff_unitary_formula: Rule1[Formula] = rule { tff_quantified_formula | tff_unary_formula | tff_atomic_formula | "(" ~ Ws ~ tff_logic_formula ~ ")" ~ Ws }
+  // private def tff_quantified_formula = rule { fol_quantifier ~ "[" ~ Ws ~ tff_variable_list ~ "]" ~ Ws ~ ":" ~ Ws ~ tff_unitary_formula ~> ( ( q: QuantifierHelper, vs, m ) => q.Block( vs, m ) ) }
+  // private def tff_unary_formula = rule { "~" ~ Ws ~ tff_unitary_formula ~> ( Neg( _ ) ) }
 
-  private def tff_logic_formula: Rule1[Formula] = rule { tff_unitary_formula ~ ( tff_binary_nonassoc_part | tff_or_formula_part | tff_and_formula_part ).? }
-  private def tff_binary_nonassoc_part = rule { binary_connective ~ tff_unitary_formula ~> ( ( a: Formula, c: ( Expr, Expr ) => Formula, b: Formula ) => c( a, b ) ) }
-  private def tff_or_formula_part = rule { ( "|" ~ Ws ~ tff_unitary_formula ).+ ~> ( ( a: Formula, as: Seq[Formula] ) => Or.leftAssociative( a +: as: _* ) ) }
-  private def tff_and_formula_part = rule { ( "&" ~ Ws ~ tff_unitary_formula ).+ ~> ( ( a: Formula, as: Seq[Formula] ) => And.leftAssociative( a +: as: _* ) ) }
-  private def tff_unitary_formula: Rule1[Formula] = rule { tff_quantified_formula | tff_unary_formula | tff_atomic_formula | "(" ~ Ws ~ tff_logic_formula ~ ")" ~ Ws }
-  private def tff_quantified_formula = rule { fol_quantifier ~ "[" ~ Ws ~ tff_variable_list ~ "]" ~ Ws ~ ":" ~ Ws ~ tff_unitary_formula ~> ( ( q: QuantifierHelper, vs, m ) => q.Block( vs, m ) ) }
-  private def tff_variable_list = rule { ( ( tff_typed_variable | tff_variable ) ~> ( ( a: Var ) => a ) ).+.separatedBy( Comma ) }
-  private def tff_unary_formula = rule { "~" ~ Ws ~ tff_unitary_formula ~> ( Neg( _ ) ) }
+  // private def tff_atomic_formula = rule { defined_prop | tff_infix_formula | tff_plain_atomic_formula | ( distinct_object ~> ( FOLAtom( _ ) ) ) }
+  // private def tff_plain_atomic_formula = rule { atomic_word ~ ( "(" ~ Ws ~ tff_arguments ~ ")" ~ Ws ).? ~> ( ( p, as ) => TptpAtom( p, as.getOrElse( Seq() ) ) ) }
+  // private def tff_infix_formula = rule { term ~ ( "=" ~ Ws ~ term ~> ( Eq( _: Expr, _ ) ) | "!=" ~ Ws ~ term ~> ( ( _: Expr ) !== _ ) ) }
 
-  private def tff_atomic_formula = rule { defined_prop | tff_infix_formula | tff_plain_atomic_formula | ( distinct_object ~> ( FOLAtom( _ ) ) ) }
-  private def tff_plain_atomic_formula = rule { atomic_word ~ ( "(" ~ Ws ~ tff_arguments ~ ")" ~ Ws ).? ~> ( ( p, as ) => TptpAtom( p, as.getOrElse( Seq() ) ) ) }
-  private def tff_infix_formula = rule { term ~ ( "=" ~ Ws ~ term ~> ( Eq( _: Expr, _ ) ) | "!=" ~ Ws ~ term ~> ( ( _: Expr ) !== _ ) ) }
+  // private def tff_term: Rule1[Expr] = rule { tff_variable | ( distinct_object ~> ( FOLConst( _ ) ) ) | ( number ~> ( FOLConst( _ ) ) ) | tff_function_term }
+  // private def tff_function_term = rule { name ~ ( "(" ~ Ws ~ tff_term.+.separatedBy( Comma ) ~ ")" ~ Ws ).? ~> ( ( hd, as ) => TptpTerm( hd, as.getOrElse( Seq() ) ) ) }
 
-  private def tff_term: Rule1[Expr] = rule { tff_variable | ( distinct_object ~> ( FOLConst( _ ) ) ) | ( number ~> ( FOLConst( _ ) ) ) | tff_function_term }
-  private def tff_function_term = rule { name ~ ( "(" ~ Ws ~ tff_term.+.separatedBy( Comma ) ~ ")" ~ Ws ).? ~> ( ( hd, as ) => TptpTerm( hd, as.getOrElse( Seq() ) ) ) }
-  private def tff_typed_variable = rule { capture( upper_word ) ~ Ws ~ ":" ~ Ws ~ tff_basic_type ~> ( Var( _, _ ) ) }
-  private def tff_variable = rule { capture( upper_word ) ~ Ws ~> ( FOLVar( _: String ) ) }
-  private def tff_arguments = rule { tff_term.+.separatedBy( Comma ) }
+  // private def tff_arguments = rule { tff_term.+.separatedBy( Comma ) }
 
   private def tff_general_list: Rule1[Seq[Expr]] = rule { "[" ~ Ws ~ tff_general_term.*.separatedBy( Comma ) ~ "]" ~ Ws }
   private def tff_general_terms = rule { tff_general_term.+.separatedBy( Comma ) }
@@ -173,26 +178,45 @@ class TptpParser( val input: ParserInput ) extends Parser {
       tff_general_list ~> ( GeneralList( _: Seq[Expr] ) )
   }
 
-  private def tff_formula_data: Rule1[Expr] = rule {
-    (
-      ( capture( "$" ~ ( "thf" | "tff" | "fof" | "cnf" ) ) ~ "(" ~ Ws ~ tff_formula ~ ")" ~ Ws ) |
-      ( capture( "$fot" ) ~ "(" ~ Ws ~ term ~ ")" ~ Ws ) ) ~> ( TptpTerm( _: String, _: Expr ) )
-  }
+  // private def tff_formula_data: Rule1[Expr] = rule {
+  //   (
+  //     ( capture( "$" ~ ( "thf" | "tff" | "fof" | "cnf" ) ) ~ "(" ~ Ws ~ tff_formula ~ ")" ~ Ws ) |
+  //     ( capture( "$fot" ) ~ "(" ~ Ws ~ term ~ ")" ~ Ws ) ) ~> ( TptpTerm( _: String, _: Expr ) )
+  // }
   private def tff_general_function = rule { atomic_word ~ "(" ~ Ws ~ tff_general_terms ~ ")" ~ Ws ~> ( TptpTerm( _, _ ) ) }
 
-  private def tff_complex_type: Rule1[(Ctx) => Ty] = rule { ( basic_type ~ !( Ws ~ ( ">" | "*" ) ) ) | mapping_type | product_type }
-  private def tff_mapping_type: Rule1[(Ctx) => Ty] = rule { ( basic_type | ( "(" ~ Ws ~ product_type ~ Ws ~ ")" ) ) ~ Ws ~ ">" ~ Ws ~ complex_type ~> ( expr.ty.TArr ) }
-  private def tff_product_type: Rule1[(Ctx) => Ty] = rule { basic_type ~ Ws ~ "*" ~ Ws ~ complex_type ~> ( expr.ty.TArr ) }
+  def tff_variable_list = rule { ( ( tff_typed_variable | tff_variable ) ~> ( ( v: CtxTo[Var] ) => ( ctx: Ctx ) => ( v( ctx ) ) ) ).+.separatedBy( Comma ) }
+  private def tff_typed_variable = rule { capture( upper_word ) ~ Ws ~ ":" ~ Ws ~ tff_basic_type ~> ( ( name, t ) => ( ( ctx: Ctx ) => Var( name, t( ctx ) ) ) ) }
+  private def tff_variable: Rule1[( Ctx ) => Var] = rule {
+    capture( upper_word ) ~ Ws ~> ( ( n: String ) => ( ctx: Ctx ) =>
+      {
+        ctx.vars.get( n ).get
+      } )
+  }
+  private def tff_complex_type: Rule1[CtxTo[Ty]] = rule { ( tff_basic_type ~ !( Ws ~ ( ">" | "*" ) ) ) | tff_mapping_type | tff_product_type }
+  private def tff_mapping_type: Rule1[CtxTo[Ty]] = rule {
+    ( tff_basic_type | ( "(" ~ Ws ~ tff_product_type ~ Ws ~ ")" ) ) ~ Ws ~ ">" ~ Ws ~ tff_complex_type ~>
+      ( ( t: CtxTo[Ty], t2: CtxTo[Ty] ) =>
+        ( ctx: Ctx ) => {
+          expr.ty.TArr( t( ctx ), t2( ctx ) )
+        } )
+  }
+
+  private def tff_product_type: Rule1[CtxTo[Ty]] = rule {
+    tff_basic_type ~ Ws ~ "*" ~ Ws ~ tff_complex_type ~> (
+      ( bt: CtxTo[Ty], ct: CtxTo[Ty] ) => ( ( ctx: Ctx ) => {
+        expr.ty.TArr( bt( ctx ), ct( ctx ) )
+      } ) )
+  }
+
   // private def product_type = rule { root_type ~ ""}
-  private def tff_basic_type: Rule1[(Ctx) => Ty] = rule {
-    atomic_word ~> ( (name: String) => ((ctx: Ctx) => 
-        name match {
-          case "$o" => To
-          case "$i" => Ti
-          case name => ctx.types.get(name).get
-        } 
-      )
-    )
+  private def tff_basic_type: Rule1[CtxTo[Ty]] = rule {
+    atomic_word ~> ( ( name: String ) => ( ( ctx: Ctx ) =>
+      name match {
+        case "$o" => To
+        case "$i" => Ti
+        case name => ctx.types.get( name ).get
+      } ) )
   }
 
   private def name: Rule1[String] = rule { atomic_word | integer }
