@@ -141,6 +141,9 @@ class TptpParser( val input: ParserInput ) extends Parser {
   }
   private def general_function = rule { atomic_word ~ "(" ~ Ws ~ general_terms ~ ")" ~ Ws ~> ( TptpTerm( _, _ ) ) }
 
+  // ==========
+  // tff
+  // ==========
   private def tff_formula = rule { tff_typed_logic_formula }
   private def tff_typed_logic_formula = rule { tff_logic_formula } //add type annotation
 
@@ -170,24 +173,26 @@ class TptpParser( val input: ParserInput ) extends Parser {
       tff_general_list ~> ( GeneralList( _: Seq[Expr] ) )
   }
 
-  private def ttff_ff_formula_data: Rule1[Expr] = rule {
+  private def tff_formula_data: Rule1[Expr] = rule {
     (
       ( capture( "$" ~ ( "thf" | "tff" | "fof" | "cnf" ) ) ~ "(" ~ Ws ~ tff_formula ~ ")" ~ Ws ) |
       ( capture( "$fot" ) ~ "(" ~ Ws ~ term ~ ")" ~ Ws ) ) ~> ( TptpTerm( _: String, _: Expr ) )
   }
   private def tff_general_function = rule { atomic_word ~ "(" ~ Ws ~ tff_general_terms ~ ")" ~ Ws ~> ( TptpTerm( _, _ ) ) }
 
-  private def tff_complex_type: Rule1[Ty] = rule { ( basic_type ~ !( Ws ~ ( ">" | "*" ) ) ) | mapping_type | product_type }
-  private def tff_mapping_type = rule { ( basic_type | ( "(" ~ Ws ~ product_type ~ Ws ~ ")" ) ) ~ Ws ~ ">" ~ Ws ~ complex_type ~> ( expr.ty.TArr ) }
-  private def tff_product_type = rule { basic_type ~ Ws ~ "*" ~ Ws ~ complex_type ~> ( expr.ty.TArr ) }
+  private def tff_complex_type: Rule1[(Ctx) => Ty] = rule { ( basic_type ~ !( Ws ~ ( ">" | "*" ) ) ) | mapping_type | product_type }
+  private def tff_mapping_type: Rule1[(Ctx) => Ty] = rule { ( basic_type | ( "(" ~ Ws ~ product_type ~ Ws ~ ")" ) ) ~ Ws ~ ">" ~ Ws ~ complex_type ~> ( expr.ty.TArr ) }
+  private def tff_product_type: Rule1[(Ctx) => Ty] = rule { basic_type ~ Ws ~ "*" ~ Ws ~ complex_type ~> ( expr.ty.TArr ) }
   // private def product_type = rule { root_type ~ ""}
-  private def tff_basic_type = rule {
-    atomic_word ~> ( name =>
-      name match {
-        case "$o" => To
-        case "$i" => Ti
-        case name => TBase( name )
-      } )
+  private def tff_basic_type: Rule1[(Ctx) => Ty] = rule {
+    atomic_word ~> ( (name: String) => ((ctx: Ctx) => 
+        name match {
+          case "$o" => To
+          case "$i" => Ti
+          case name => ctx.types.get(name).get
+        } 
+      )
+    )
   }
 
   private def name: Rule1[String] = rule { atomic_word | integer }
