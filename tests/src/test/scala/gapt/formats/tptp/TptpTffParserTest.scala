@@ -16,11 +16,11 @@ class TptpTffParserTest extends Specification {
       TptpFile( Seq( IncludeDirective( fileName, None ) ) ),
       fileName => TptpImporter.loadWithoutIncludes( ClasspathInputFile( fileName ) ) )
 
-  "tffBasics" in {
+  "A: $i > $o,B:$i,C:$i*$o" in {
 
-    val l = new TptpParser( "A: $i > $o, B: $i, C: $i * $o" ).tff_variable_list.run()
+    val l = new TptpParser( "A: $i > $o,B:$i,C:$i*$o" ).tff_variable_list.run()
     l match {
-      case Success( value )     => println(value)
+      case Success( value )     => println( value.map( _( Ctx() ) ).foldLeft( "" )( _ + ", " + _ ) )
       case Failure( exception ) => failure
     }
     ok
