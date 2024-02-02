@@ -136,6 +136,7 @@ class TptpParser( val input: ParserInput ) extends Parser {
   private def formula_role = rule { atomic_word }
   private def annotations = rule { ( Comma ~ general_term ).* }
 
+  // TODO: implement (Either (tff_atom_typing, tff_subtype )
   private def typedef: Rule1[Formula] = rule { ( Ws ~ lower_word ~ ":" ~ Ws ~ complex_type ) ~> ( ( a: Ty ) => Top() ) }
   // private def typedef: Rule1[Formula] = rule { (variable ~  ":" ~ Ws ~ name)  ~> ((b:String, a: FOLVar) => FOLAtom(a.name, a) ) }
 
@@ -241,7 +242,7 @@ class TptpParser( val input: ParserInput ) extends Parser {
   private def tff_variable: Rule1[( Ctx ) => Var] = rule {
     capture( upper_word ) ~ Ws ~> ( ( n: String ) => ( ctx: Ctx ) =>
       {
-        ctx.vars.get( n ).getOrElse( throw new MalformedInputFileException( "Variable (" + n + ") not defined in context" ) )
+        ctx.vars.get( n ).getOrElse( throw new MalformedInputFileException( "Variable (" + n + ") not defined in context" ) ) // TODO: are all variables necessarily quanti// TODO: are all variables necessarily quantifiedd
       } )
   }
 
@@ -328,7 +329,7 @@ object TptpImporter {
         throw new IllegalArgumentException( s"Parse error in ${file.fileName}:\n" +
           parser.formatError( error, new ErrorFormatter( showTraces = true ) ) )
       case Failure( exception ) => throw exception
-      case Success( value )     => value( Ctx() ) // TODO:
+      case Success( value )     => value( new Ctx( Map(), Map( "$real" -> TBase( "$real" ), "$int" -> TBase( "$int" ), "$rat" -> TBase( "$rat" ), "$tType" -> TBase( "$tType" ) ) ) ) // TODO: rework list of types in context, maybe move to parser def
     }
   }
 
