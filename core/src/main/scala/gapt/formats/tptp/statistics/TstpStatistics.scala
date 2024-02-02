@@ -49,6 +49,8 @@ object TstpError {
       case ReconstructionGaveUp( _ )  => "ReconstructionGaveUp"
       case ReconstructionTimeout( _ ) => "ReconstuctionTimeout"
       case StackOverflow( _ )         => "StackOverflow"
+      case TypeNotFound( _ )          => "Type not in Context" 
+      case VariableNotFound( _ )      => "Varibale not in Context" 
     }
 
     val row = e.file match {
@@ -117,6 +119,24 @@ case class ReconstructionError[+T <: FileData]( override val file: T ) extends T
  */
 @SerialVersionUID( 700008L )
 case class StackOverflow[+T <: FileData]( override val file: T ) extends TstpError( file )
+
+
+/**
+ * Signifies an unknown type in typed logic formats 
+ * @param file The file with the TSTP proof that was replayed
+ * @tparam T an instance of [[FileData]]
+ */
+@SerialVersionUID( 7000012L )
+case class TypeNotFound[+T <: FileData]( override val file: T ) extends TstpError( file )
+
+
+/**
+ * Signifies an unknown variable  * @param file The file with the TSTP proof that was replayed
+ * @tparam T an instance of [[FileData]]
+ */
+@SerialVersionUID( 7000013L )
+case class VariableNotFound[+T <: FileData]( override val file: T ) extends TstpError( file )
+
 
 /**
  * Divides a list of [[TstpError]] into its sublasses
