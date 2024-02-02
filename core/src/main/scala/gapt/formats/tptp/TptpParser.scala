@@ -27,10 +27,11 @@ import scala.util.{ Failure, Success }
 import gapt.formats.tptp.GeneralTerm
 import org.parboiled2.support.hlist
 import org.parboiled2.support.hlist.HNil
+import gapt.formats.tptp.statistics.ParsingError
 
 class Ctx( val vars: Map[String, Var], val types: Map[String, Ty] ) {
 
-  def apply[A](to: A): A = to
+  def apply[A]( to: A ): A = to
 
   def apply[A]( to: ( Ctx => A ) ): A = {
     to( this )
@@ -40,9 +41,9 @@ class Ctx( val vars: Map[String, Var], val types: Map[String, Ty] ) {
     to.map( _( this ) )
   }
 
-  def apply[A](to: Option[A]): Option[A] = {
-    to.map(this(_))
-  } 
+  def apply[A]( to: Option[A] ): Option[A] = {
+    to.map( this( _ ) )
+  }
 
   def >=[A]( to: ( Ctx => A ) ): A = {
     to( this )
@@ -177,9 +178,9 @@ class TptpParser( val input: ParserInput ) extends Parser {
   private def general_terms = rule { general_term.+.separatedBy( Comma ) }
   private def general_term: Rule1[CtxTo[Expr]] = rule {
     general_data ~ ( ":" ~ Ws ~ general_term ).? ~> ( ( d, to ) => ( ctx: Ctx ) => {
-      val dExp = d(ctx)
+      val dExp = d( ctx )
       to.fold( dExp )( t => GeneralColon( dExp, t( ctx ) ) )
-    }) |
+    } ) |
       general_list ~> ( ( l: Seq[CtxTo[Expr]] ) => ( ( ctx: Ctx ) => GeneralList( ctx( l ) ) ) )
   }
   private def general_data: Rule1[CtxTo[Expr]] = rule {
@@ -201,8 +202,8 @@ class TptpParser( val input: ParserInput ) extends Parser {
   //
   private def tff_logic_formula: Rule1[CtxTo[Formula]] = rule { tff_unitary_formula ~ ( tff_binary_nonassoc_part | tff_or_formula_part | tff_and_formula_part ).? }
   private def tff_binary_nonassoc_part = rule { binary_connective ~ tff_unitary_formula ~> ( ( a: CtxTo[Formula], c: ( Expr, Expr ) => Formula, b: CtxTo[Formula] ) => ( ctx: Ctx ) => c( a( ctx ), b( ctx ) ) ) }
-  private def tff_or_formula_part = rule { ( "|" ~ Ws ~ tff_unitary_formula ).+ ~> ( ( a: CtxTo[Formula], as: Seq[CtxTo[Formula]] ) => ( ctx: Ctx ) => Or.leftAssociative( a( ctx ) +: ctx(as): _* ) ) }
-  private def tff_and_formula_part = rule { ( "&" ~ Ws ~ tff_unitary_formula ).+ ~> ( ( a: CtxTo[Formula], as: Seq[CtxTo[Formula]] ) => ( ctx: Ctx ) => And.leftAssociative( a( ctx ) +: ctx(as): _* ) ) }
+  private def tff_or_formula_part = rule { ( "|" ~ Ws ~ tff_unitary_formula ).+ ~> ( ( a: CtxTo[Formula], as: Seq[CtxTo[Formula]] ) => ( ctx: Ctx ) => Or.leftAssociative( a( ctx ) +: ctx( as ): _* ) ) }
+  private def tff_and_formula_part = rule { ( "&" ~ Ws ~ tff_unitary_formula ).+ ~> ( ( a: CtxTo[Formula], as: Seq[CtxTo[Formula]] ) => ( ctx: Ctx ) => And.leftAssociative( a( ctx ) +: ctx( as ): _* ) ) }
   private def tff_unitary_formula: Rule1[CtxTo[Formula]] = rule { tff_quantified_formula | tff_unary_formula | tff_atomic_formula | "(" ~ Ws ~ tff_logic_formula ~ ")" ~ Ws }
   private def tff_quantified_formula = rule {
     fol_quantifier ~ "[" ~ Ws ~ tff_variable_list ~ "]" ~ Ws ~ ":" ~ Ws ~ tff_unitary_formula ~> ( ( q: QuantifierHelper, vs, m ) => ( ctx: Ctx ) => {
@@ -213,7 +214,7 @@ class TptpParser( val input: ParserInput ) extends Parser {
   private def tff_unary_formula = rule { "~" ~ Ws ~ tff_unitary_formula ~> ( f => ( ctx: Ctx ) => Neg( f( ctx ) ) ) }
 
   private def tff_atomic_formula = rule { lift( defined_prop ) | tff_infix_formula | tff_plain_atomic_formula | ( distinct_object ~> ( ( o: String ) => Ctx.mReturn( FOLAtom( o ) ) ) ) }
-  private def tff_plain_atomic_formula = rule { atomic_word ~ ( "(" ~ Ws ~ tff_arguments ~ ")" ~ Ws ).? ~> ( ( p: String, as: Option[Seq[Ctx => Expr]] ) => ( ctx: Ctx ) => TptpAtom( p, as.map(ctx(_)).getOrElse( Seq() ) ) ) }
+  private def tff_plain_atomic_formula = rule { atomic_word ~ ( "(" ~ Ws ~ tff_arguments ~ ")" ~ Ws ).? ~> ( ( p: String, as: Option[Seq[Ctx => Expr]] ) => ( ctx: Ctx ) => TptpAtom( p, as.map( ctx( _ ) ).getOrElse( Seq() ) ) ) }
   private def tff_infix_formula = rule { tff_term ~ ( "=" ~ Ws ~ tff_term ~> ( ( a: CtxTo[Expr], b ) => ( ctx: Ctx ) => Eq( a( ctx ): Expr, b( ctx ) ) ) | "!=" ~ Ws ~ tff_term ~> ( ( a: CtxTo[Expr], b ) => ( ctx: Ctx ) => ( a( ctx ): Expr ) !== b( ctx ) ) ) }
 
   private def tff_term: Rule1[CtxTo[Expr]] = rule { tff_variable | ( distinct_object ~> ( d => Ctx.mReturn( FOLConst( d ) ) ) ) | ( number ~> ( n => Ctx.mReturn( FOLConst( n ) ) ) ) | tff_function_term }
@@ -240,7 +241,7 @@ class TptpParser( val input: ParserInput ) extends Parser {
   private def tff_variable: Rule1[( Ctx ) => Var] = rule {
     capture( upper_word ) ~ Ws ~> ( ( n: String ) => ( ctx: Ctx ) =>
       {
-        ctx.vars.get( n ).get // TODO: 
+        ctx.vars.get( n ).getOrElse( throw new MalformedInputFileException( "Variable (" + n + ") not defined in context" ) )
       } )
   }
 
@@ -249,14 +250,14 @@ class TptpParser( val input: ParserInput ) extends Parser {
     ( tff_basic_type | ( "(" ~ Ws ~ tff_product_type ~ Ws ~ ")" ) ) ~ Ws ~ ">" ~ Ws ~ tff_complex_type ~>
       ( ( t: CtxTo[Ty], t2: CtxTo[Ty] ) =>
         ( ctx: Ctx ) => {
-          expr.ty.TArr( ctx( t ), t2( ctx ) ) // TODO:
+          expr.ty.TArr( ctx( t ), t2( ctx ) )
         } )
   }
 
   private def tff_product_type: Rule1[CtxTo[Ty]] = rule {
     tff_basic_type ~ Ws ~ "*" ~ Ws ~ tff_complex_type ~> (
       ( bt: CtxTo[Ty], ct: CtxTo[Ty] ) => ( ( ctx: Ctx ) => {
-        expr.ty.TArr( bt( ctx ), ct( ctx ) ) // TODO: 
+        expr.ty.TArr( bt( ctx ), ct( ctx ) )
       } ) )
   }
 
@@ -266,7 +267,7 @@ class TptpParser( val input: ParserInput ) extends Parser {
       name match {
         case "$o" => To
         case "$i" => Ti
-        case name => ctx.types.get( name ).get // TODO: 
+        case name => ctx.types.get( name ).getOrElse( throw new MalformedInputFileException( "Type (" + name + ") not defined in context" ) )
       } ) )
   }
 
