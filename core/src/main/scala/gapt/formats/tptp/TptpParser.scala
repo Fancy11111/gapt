@@ -120,9 +120,10 @@ class TptpParser( val input: ParserInput ) extends Parser {
   def TPTP_file: Rule1[CtxTo[TptpFile]] = rule { Ws ~ TPTP_input.* ~ EOI ~> ( ( seq: Seq[CtxTo[TptpInput]] ) => ( ctx: Ctx ) => ( TptpFile( seq.map( _( ctx ) ) ) ) ) }
 
   // private def TPTP_input = rule { typedef_formula | annotated_formula | include }
-  private def TPTP_input = rule { typedef_formula | annotated_formula | lift( include ) }
+  private def TPTP_input = rule { typedef_formula | tff_annotated_formula | annotated_formula | lift( include ) }
 
   private def annotated_formula: Rule1[CtxTo[TptpInput]] = rule {
+
     atomic_word ~ "(" ~ Ws ~ name ~ Comma ~ ( formula_role ~ Comma ~ lift( formula ) ) ~ annotations ~ ")." ~ Ws ~>
       ( ( lang: String, name: String, role: String, form: CtxTo[Formula], ann: Seq[CtxTo[GeneralTerm]] ) => ( ctx: Ctx ) => ( AnnotatedFormula( lang, name, role, form( ctx ), ann.map( _( ctx ) ) ) ) )
   }
@@ -130,6 +131,11 @@ class TptpParser( val input: ParserInput ) extends Parser {
   private def typedef_formula: Rule1[CtxTo[Typedef]] = rule {
     atomic_word ~ "(" ~ Ws ~ name ~ Comma ~ Ws ~ "type" ~ Ws ~ Comma ~ Ws ~ atomic_word ~ Ws ~ ":" ~ Ws ~ tff_complex_type ~ annotations ~ ")." ~ Ws ~>
       ( ( lang: String, name: String, typeName: String, ty: CtxTo[Ty], ann: Seq[CtxTo[GeneralTerm]] ) => ( ctx: Ctx ) => ( Typedef( lang, name, typeName, ty( ctx ), ann.map( _( ctx ) ) ) ) )
+  }
+
+  private def tff_annotated_formula: Rule1[CtxTo[TptpInput]] = rule {
+    "tff(" ~ Ws ~ name ~ Comma ~ ( formula_role ~ Comma ~ tff_logic_formula ) ~ annotations ~ ")." ~ Ws ~>
+      ( ( name: String, role: String, form: CtxTo[Formula], ann: Seq[CtxTo[GeneralTerm]] ) => ( ctx: Ctx ) => ( AnnotatedFormula( "tff", name, role, form( ctx ), ann.map( _( ctx ) ) ) ) )
   }
 
   // TODO: maybe fix the list of possible roles to values defined in specs
@@ -206,7 +212,7 @@ class TptpParser( val input: ParserInput ) extends Parser {
   private def tff_or_formula_part = rule { ( "|" ~ Ws ~ tff_unitary_formula ).+ ~> ( ( a: CtxTo[Formula], as: Seq[CtxTo[Formula]] ) => ( ctx: Ctx ) => Or.leftAssociative( a( ctx ) +: ctx( as ): _* ) ) }
   private def tff_and_formula_part = rule { ( "&" ~ Ws ~ tff_unitary_formula ).+ ~> ( ( a: CtxTo[Formula], as: Seq[CtxTo[Formula]] ) => ( ctx: Ctx ) => And.leftAssociative( a( ctx ) +: ctx( as ): _* ) ) }
   private def tff_unitary_formula: Rule1[CtxTo[Formula]] = rule { tff_quantified_formula | tff_unary_formula | tff_atomic_formula | "(" ~ Ws ~ tff_logic_formula ~ ")" ~ Ws }
-  private def tff_quantified_formula = rule {
+  def tff_quantified_formula = rule {
     fol_quantifier ~ "[" ~ Ws ~ tff_variable_list ~ "]" ~ Ws ~ ":" ~ Ws ~ tff_unitary_formula ~> ( ( q: QuantifierHelper, vs, m ) => ( ctx: Ctx ) => {
       val vars = vs.map( _( ctx ) )
       q.Block( vs.map( _( ctx ) ), m( Ctx( ctx, vars ) ) )
@@ -215,11 +221,11 @@ class TptpParser( val input: ParserInput ) extends Parser {
   private def tff_unary_formula = rule { "~" ~ Ws ~ tff_unitary_formula ~> ( f => ( ctx: Ctx ) => Neg( f( ctx ) ) ) }
 
   private def tff_atomic_formula = rule { lift( defined_prop ) | tff_infix_formula | tff_plain_atomic_formula | ( distinct_object ~> ( ( o: String ) => Ctx.mReturn( FOLAtom( o ) ) ) ) }
-  private def tff_plain_atomic_formula = rule { atomic_word ~ ( "(" ~ Ws ~ tff_arguments ~ ")" ~ Ws ).? ~> ( ( p: String, as: Option[Seq[Ctx => Expr]] ) => ( ctx: Ctx ) => TptpAtom( p, as.map( ctx( _ ) ).getOrElse( Seq() ) ) ) }
+  private def tff_plain_atomic_formula = rule { atomic_word ~ ( "(" ~ Ws ~ tff_arguments ~ ")" ~ Ws ).? ~> ( ( p: String, as: Option[Seq[Ctx => Expr]] ) => ( ctx: Ctx ) => TptpAtom( p, as.map( ctx( _ ) ).getOrElse( Seq() ), ctx ) ) }
   private def tff_infix_formula = rule { tff_term ~ ( "=" ~ Ws ~ tff_term ~> ( ( a: CtxTo[Expr], b ) => ( ctx: Ctx ) => Eq( a( ctx ): Expr, b( ctx ) ) ) | "!=" ~ Ws ~ tff_term ~> ( ( a: CtxTo[Expr], b ) => ( ctx: Ctx ) => ( a( ctx ): Expr ) !== b( ctx ) ) ) }
 
   private def tff_term: Rule1[CtxTo[Expr]] = rule { tff_variable | ( distinct_object ~> ( d => Ctx.mReturn( FOLConst( d ) ) ) ) | ( number ~> ( n => Ctx.mReturn( FOLConst( n ) ) ) ) | tff_function_term }
-  private def tff_function_term: Rule1[CtxTo[Expr]] = rule { name ~ ( "(" ~ Ws ~ tff_term.+.separatedBy( Comma ) ~ ")" ~ Ws ).? ~> ( ( hd: String, as: Option[Seq[CtxTo[Expr]]] ) => ( ( ctx: Ctx ) => TptpTerm( hd, as.map( _.map( _( ctx ) ) ).getOrElse( Seq() ) ) ) ) }
+  private def tff_function_term: Rule1[CtxTo[Expr]] = rule { name ~ ( "(" ~ Ws ~ tff_term.+.separatedBy( Comma ) ~ ")" ~ Ws ).? ~> ( ( hd: String, as: Option[Seq[CtxTo[Expr]]] ) => ( ( ctx: Ctx ) => TptpTerm( hd, as.getOrElse( Seq() ), ctx ) ) ) }
 
   private def tff_arguments: Rule1[Seq[Ctx => Expr]] = rule { tff_term.+.separatedBy( Comma ) }
 
@@ -242,7 +248,8 @@ class TptpParser( val input: ParserInput ) extends Parser {
   private def tff_variable: Rule1[( Ctx ) => Var] = rule {
     capture( upper_word ) ~ Ws ~> ( ( n: String ) => ( ctx: Ctx ) =>
       {
-        ctx.vars.get( n ).getOrElse( throw new MalformedInputFileException( "Variable (" + n + ") not defined in context" ) ) // TODO: are all variables necessarily quanti// TODO: are all variables necessarily quantifiedd
+        // TODO: are all variables necessarily quantified
+        ctx.vars.get( n ).getOrElse( Var( n, To ) )
       } )
   }
 
@@ -329,7 +336,8 @@ object TptpImporter {
         throw new IllegalArgumentException( s"Parse error in ${file.fileName}:\n" +
           parser.formatError( error, new ErrorFormatter( showTraces = true ) ) )
       case Failure( exception ) => throw exception
-      case Success( value )     => value( new Ctx( Map(), Map( "$real" -> TBase( "$real" ), "$int" -> TBase( "$int" ), "$rat" -> TBase( "$rat" ), "$tType" -> TBase( "$tType" ) ) ) ) // TODO: rework list of types in context, maybe move to parser def
+      // TODO: rework list of types in context, maybe move to parser def
+      case Success( value )     => value( new Ctx( Map(), Map( "$real" -> TBase( "$real" ), "$int" -> TBase( "$int" ), "$rat" -> TBase( "$rat" ), "$tType" -> TBase( "$tType" ) ) ) )
     }
   }
 

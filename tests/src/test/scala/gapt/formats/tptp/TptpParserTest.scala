@@ -24,16 +24,17 @@ class TptpParserTest extends Specification {
     ok
   }
 
-  "tffProblems" should {
+  "tffProblems" in {
+    loadTPTP( "ANA134_1.002.032.p" ).inputs.foreach( v => print( TptpToString.tptpInput( v ) ) )
     ok
     // loadTPTP( "ANA134_1.002.032.p" )
-    // loadTPTP( "ANA134_1.002.032.p" ).inputs.foreach( v => print( TptpToString.tptpInput( v ) ) )
     // TptpTypeChecker.extractTypes( loadTPTP( "ANA134_1.002.032.p" ) ).foreach( println( _ ) )
     // TptpTypeChecker.topLevelTypes( loadTPTP( "ANA134_1.002.032.p" ) ).foreach( println( _ ) )
-  }.prepend( Files.newDirectoryStream( Paths.get( getClass.getResource( "/tff-problems" ).toURI() ) ).iterator.asScala.map( p => {
-    "load " + p.getFileName.toString in {
-      loadTPTP( "tff-problems/" + p.getFileName().toString() )
-      ok
-    }
-  } ).toSeq )
+  }
+  // }.prepend( Files.newDirectoryStream( Paths.get( getClass.getResource( "/tff-problems" ).toURI() ) ).iterator.asScala.map( p => {
+  //   "load " + p.getFileName.toString in {
+  //     loadTPTP( "tff-problems/" + p.getFileName().toString() )
+  //     ok
+  //   }
+  // } ).toSeq )
 }

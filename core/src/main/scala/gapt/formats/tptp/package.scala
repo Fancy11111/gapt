@@ -59,9 +59,12 @@ package object tptp {
 
   object TptpTerm {
     def apply( sym: String, args: Seq[Expr] ): Expr =
-      Apps( Const( sym, FunctionType( Ti, args.map( _.ty ) ) ), args )
+      Apps( Const( sym, FunctionType( Ti, args.map( _.ty ) ) ), args ) // TODO: add optional ctx lookup
     def apply( sym: String, args: Expr* )( implicit dummyImplicit: DummyImplicit ): Expr =
       TptpTerm( sym, args )
+    def apply( sym: String, args: Seq[Ctx => Expr], ctx: Ctx ): Expr =
+      // TODO: correct exception
+      Apps( Const( sym, ctx.vars.get( sym ).map( v => v.ty ).getOrElse( throw new RuntimeException() ) ), ctx( args ) )
     def unapplySeq( expr: Expr ): Option[( String, Seq[Expr] )] = expr match {
       case Apps( Const( sym, _, _ ), args ) => Some( ( sym, args ) )
       case _                                => None
@@ -72,6 +75,13 @@ package object tptp {
       case ( "equal", Seq( a, b ) ) => Eq( a, b ) // old tptp syntax
       case _                        => Apps( Const( sym, FunctionType( To, args.map( _.ty ) ) ), args ).asInstanceOf[Atom]
     }
+
+  def TptpAtom( sym: String, args: Seq[Expr], ctx: Ctx ): Atom = {
+
+    ( sym, args ) match {
+      case _ => Apps( Const( sym, ctx.vars.get( sym ).getOrElse( throw new RuntimeException() ).ty ), args ).asInstanceOf[Atom]
+    }
+  }
 
   object GeneralList {
     val name = "$general_list"
