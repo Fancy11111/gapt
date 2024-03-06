@@ -13,6 +13,9 @@ import org.parboiled2.ErrorFormatter
 import gapt.expr.ty.To
 import gapt.expr.ty.Ti
 import gapt.expr.Var
+import org.specs2.specification.core.Fragments
+import scala.util.Try
+import gapt.expr.formula.Formula
 
 class TptpTffParserTest extends Specification {
 
@@ -31,7 +34,7 @@ class TptpTffParserTest extends Specification {
     ok
   }
 
-  "! [A: $i > $o,B:$i,C:$i*$o : 'A'(B)]" in {
+  "does this work?" in {
 
     val parser = new TptpParser( "! [A: $i > $o,B:$i,C:$i*$o,D:$o] : a(B)" )
     val l = parser.tff_quantified_formula.run()
@@ -49,10 +52,10 @@ class TptpTffParserTest extends Specification {
     ok
   }
 
-  "(![X:$i] : p(X)) | (?[X:$o]: q(X))" in {
-    val parser = new TptpParser( "(![X:$i] : p(X)) | (?[X:$o]: q(X))" )
-    val l = parser.tff_logic_formula.run()
-    l match {
+  "typedef" in {
+    val parser = new TptpParser( "tff(animal_type,type, animal: $tType )." )
+    val res = parser.typedef_formula.run()
+    res match {
       case Success( value ) => println( value( new Ctx( Map( "p" -> Var( "p", gapt.expr.ty.TArr( Ti, To ) ), "q" -> Var( "q", gapt.expr.ty.TArr( To, To ) ) ), Map() ) ) )
       case Failure( e: ParseError ) => {
         println( parser.formatError( e, new ErrorFormatter( showTraces = true ) ) )
@@ -66,57 +69,98 @@ class TptpTffParserTest extends Specification {
     ok
   }
 
-  "![X:$i] : (p(X) & ![X:$o] : q(X))" in {
-    val parser = new TptpParser( "![X:$i] : (p(X) & ![X:$o] : q(X))" )
-    val l = parser.tff_logic_formula.run()
-    l match {
-      case Success( value ) => println( value( new Ctx( Map( "p" -> Var( "p", gapt.expr.ty.TArr( Ti, To ) ), "q" -> Var( "q", gapt.expr.ty.TArr( To, To ) ) ), Map() ) ) )
-      case Failure( e: ParseError ) => {
-        println( parser.formatError( e, new ErrorFormatter( showTraces = true ) ) )
-        failure
+  Fragments.foreach( Seq(
+    ( "(![X:$i] : p(X)) | (?[X:$o]: q(X))", new Ctx( Map( "p" -> Var( "p", gapt.expr.ty.TArr( Ti, To ) ), "q" -> Var( "q", gapt.expr.ty.TArr( To, To ) ) ), Map() ), ( p: TptpParser ) => ( p.tff_logic_formula.run() ) ),
+    ( "![X:$i] : (p(X) & ![X:$o] : q(X))", new Ctx( Map( "p" -> Var( "p", gapt.expr.ty.TArr( Ti, To ) ), "q" -> Var( "q", gapt.expr.ty.TArr( To, To ) ) ), Map() ), ( p: TptpParser ) => ( p.tff_logic_formula.run() ) ),
+    ( "![X:$i] : (![X:$o] : q(X)  => p(X) )", new Ctx( Map( "p" -> Var( "p", gapt.expr.ty.TArr( Ti, To ) ), "q" -> Var( "q", gapt.expr.ty.TArr( To, To ) ) ), Map() ), ( p: TptpParser ) => ( p.tff_logic_formula.run() ) ),
+    ( "! [A: $i > $o,B:$i,C:$i*$o,D:$o] : a(B)", Ctx( Ctx(), "a", Var( "a", gapt.expr.ty.TArr( Ti, To ) ) ), ( p: TptpParser ) => ( p.tff_quantified_formula.run() ) ) ) ) {
+    case ( exp, ctx, pRun ) =>
+      exp in {
+        val parser = new TptpParser( exp )
+        val res = pRun( parser )
+        res match {
+          case Success( value ) => println( value( new Ctx( Map( "p" -> Var( "p", gapt.expr.ty.TArr( Ti, To ) ), "q" -> Var( "q", gapt.expr.ty.TArr( To, To ) ) ), Map() ) ) )
+          case Failure( e: ParseError ) => {
+            println( parser.formatError( e, new ErrorFormatter( showTraces = true ) ) )
+            failure
+          }
+          case Failure( exception ) => {
+            println( "cause" )
+            failure
+          }
+        }
+        ok
       }
-      case Failure( exception ) => {
-        println( "cause" )
-        failure
-      }
-    }
-    ok
   }
 
-  "![X:$i] : (![X:$o] : q(X)  => p(X) )" in {
-    val parser = new TptpParser( "![X:$i] : (![X:$o] : q(X)  => p(X) )" )
-    val l = parser.tff_logic_formula.run()
-    l match {
-      case Success( value ) => println( value( new Ctx( Map( "p" -> Var( "p", gapt.expr.ty.TArr( Ti, To ) ), "q" -> Var( "q", gapt.expr.ty.TArr( To, To ) ) ), Map() ) ) )
-      case Failure( e: ParseError ) => {
-        println( parser.formatError( e, new ErrorFormatter( showTraces = true ) ) )
-        failure
-      }
-      case Failure( exception ) => {
-        println( "cause" )
-        failure
-      }
-    }
-    ok
-  }
-
-  "! [A: $i > $o,B:$i,C:$i*$o : 'A'(B)]" in {
-
-    val parser = new TptpParser( "! [A: $i > $o,B:$i,C:$i*$o,D:$o] : a(B)" )
-    val l = parser.tff_quantified_formula.run()
-    l match {
-      case Success( value ) => println( value( Ctx( Ctx(), "a", Var( "a", gapt.expr.ty.TArr( Ti, To ) ) ) ).toString() )
-      case Failure( e: ParseError ) => {
-        println( parser.formatError( e, new ErrorFormatter( showTraces = true ) ) )
-        failure
-      }
-      case Failure( exception ) => {
-        println( "cause" )
-        failure
-      }
-    }
-    ok
-  }
+  // "(![X:$i] : p(X)) | (?[X:$o]: q(X))" in {
+  //   val parser = new TptpParser( "(![X:$i] : p(X)) | (?[X:$o]: q(X))" )
+  //   val l = parser.tff_logic_formula.run()
+  //   l match {
+  //     case Success( value ) => println( value( new Ctx( Map( "p" -> Var( "p", gapt.expr.ty.TArr( Ti, To ) ), "q" -> Var( "q", gapt.expr.ty.TArr( To, To ) ) ), Map() ) ) )
+  //     case Failure( e: ParseError ) => {
+  //       println( parser.formatError( e, new ErrorFormatter( showTraces = true ) ) )
+  //       failure
+  //     }
+  //     case Failure( exception ) => {
+  //       println( "cause" )
+  //       failure
+  //     }
+  //   }
+  //   ok
+  // }
+  //
+  // "![X:$i] : (p(X) & ![X:$o] : q(X))" in {
+  //   val parser = new TptpParser( "![X:$i] : (p(X) & ![X:$o] : q(X))" )
+  //   val l = parser.tff_logic_formula.run()
+  //   l match {
+  //     case Success( value ) => println( value( new Ctx( Map( "p" -> Var( "p", gapt.expr.ty.TArr( Ti, To ) ), "q" -> Var( "q", gapt.expr.ty.TArr( To, To ) ) ), Map() ) ) )
+  //     case Failure( e: ParseError ) => {
+  //       println( parser.formatError( e, new ErrorFormatter( showTraces = true ) ) )
+  //       failure
+  //     }
+  //     case Failure( exception ) => {
+  //       println( "cause" )
+  //       failure
+  //     }
+  //   }
+  //   ok
+  // }
+  //
+  // "![X:$i] : (![X:$o] : q(X)  => p(X) )" in {
+  //   val parser = new TptpParser( "![X:$i] : (![X:$o] : q(X)  => p(X) )" )
+  //   val l = parser.tff_logic_formula.run()
+  //   l match {
+  //     case Success( value ) => println( value( new Ctx( Map( "p" -> Var( "p", gapt.expr.ty.TArr( Ti, To ) ), "q" -> Var( "q", gapt.expr.ty.TArr( To, To ) ) ), Map() ) ) )
+  //     case Failure( e: ParseError ) => {
+  //       println( parser.formatError( e, new ErrorFormatter( showTraces = true ) ) )
+  //       failure
+  //     }
+  //     case Failure( exception ) => {
+  //       println( "cause" )
+  //       failure
+  //     }
+  //   }
+  //   ok
+  // }
+  //
+  // "! [A: $i > $o,B:$i,C:$i*$o : 'A'(B)]" in {
+  //
+  //   val parser = new TptpParser( "! [A: $i > $o,B:$i,C:$i*$o,D:$o] : a(B)" )
+  //   val l = parser.tff_quantified_formula.run()
+  //   l match {
+  //     case Success( value ) => println( value( Ctx( Ctx(), "a", Var( "a", gapt.expr.ty.TArr( Ti, To ) ) ) ).toString() )
+  //     case Failure( e: ParseError ) => {
+  //       println( parser.formatError( e, new ErrorFormatter( showTraces = true ) ) )
+  //       failure
+  //     }
+  //     case Failure( exception ) => {
+  //       println( "cause" )
+  //       failure
+  //     }
+  //   }
+  //   ok
+  // }
 
   "Should fail type mismatch: ! [A: $i > $o,B:$i,C:$i*$o : a(B)]" in {
 
@@ -144,9 +188,37 @@ class TptpTffParserTest extends Specification {
   }
 
   // TODO
-  "tf0 test" in {
-    TptpImporter.loadWithoutIncludes( ClasspathInputFile( "TFO.p" ) )
-    ok
+  Fragments.foreach( Seq( "TF0.p" ) ) { file_name =>
+    file_name in
+      {
+        val file = ClasspathInputFile( file_name )
+        println( file_name )
+        val parser = new TptpParser( file.read )
+        val res = parser.TPTP_file.run()
+        res match {
+          case Success( value ) => {
+            println( value( new Ctx( Map(), Map() ) ) )
+            ok
+          }
+          case Failure( e: ParseError ) => {
+            println( parser.formatError( e, new ErrorFormatter( showTraces = true ) ) )
+            failure
+          }
+
+          case Failure( e: IllegalArgumentException ) => {
+            println( "cause" )
+            e.printStackTrace()
+            failure
+          }
+          case Failure( exception ) => {
+            println( "cause" )
+            exception.printStackTrace()
+            failure
+          }
+
+        }
+        ok
+      }
   }
 
 }
