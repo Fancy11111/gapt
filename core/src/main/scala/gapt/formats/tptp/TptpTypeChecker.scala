@@ -16,7 +16,7 @@ object TptpTypeChecker {
   def extractTypes( tf: TptpFile ): Map[String, Ty] = {
     tf match {
       case TptpFile( inputs ) => inputs.map( _ match {
-        case Typedef( _, n, tn, ty, _ ) => ( tn, ty )
+        case TypeDef( _, n, tn, ty, _ ) => ( tn, ty )
         case any                        => ( null, Ti )
       } ).filter( _ match {
         case ( null, _ ) => false

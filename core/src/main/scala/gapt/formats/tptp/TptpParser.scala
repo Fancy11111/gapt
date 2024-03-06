@@ -28,6 +28,7 @@ import gapt.formats.tptp.GeneralTerm
 import org.parboiled2.support.hlist
 import org.parboiled2.support.hlist.HNil
 import gapt.formats.tptp.statistics.ParsingError
+import gapt.formats.tptp.TptpFile
 
 class Ctx( val vars: Map[String, Var], val types: Map[String, Ty] ) {
 
@@ -117,10 +118,35 @@ class TptpParser( val input: ParserInput ) extends Parser {
   private def Comma = rule { "," ~ Ws }
   private def Colon = rule { ":" ~ Ws }
 
-  def TPTP_file: Rule1[CtxTo[TptpFile]] = rule { Ws ~ TPTP_input.* ~ EOI ~> ( ( seq: Seq[CtxTo[TptpInput]] ) => ( ctx: Ctx ) => ( TptpFile( seq.map( _( ctx ) ) ) ) ) }
+  // def TPTP_file: Rule1[CtxTo[TptpFile]] = rule { Ws ~ TPTP_input.* ~ EOI ~> ( ( seq: Seq[CtxTo[TptpInput]] ) => ( ctx: Ctx ) => ( TptpFile( seq.map( _( ctx ) ) ) ) ) }
+  def TPTP_file: Rule1[CtxTo[TptpFile]] = rule {
+    Ws ~ TPTP_input.* ~ EOI ~> ( ( seq: Seq[CtxTo[TptpInput]] ) => ( ctx: Ctx ) =>
+      seq.foldLeft( ( ctx, Seq[TptpInput]() ) ) {
+        ( acc, ctxToFormula ) =>
+          acc match {
+            case ( c, s ) => {
+              val formula = ctxToFormula( c )
+              formula match {
+                case TypeDef( _, _, name, ty, o ) => {
+                  ( Ctx( c, name, ty ), s :+ formula )
+                }
+                case ConstDef( _, _, name, v, _ ) => {
+                  ( Ctx( c, name, v ), s :+ formula )
+                }
+                case other => {
+                  ( c, s :+ other )
+                }
+              }
+            }
+          }
+      } match {
+        case ( _, formulas ) => TptpFile( formulas )
+      } )
+
+  }
 
   // private def TPTP_input = rule { typedef_formula | annotated_formula | include }
-  private def TPTP_input = rule { atom_def_formula | tff_annotated_formula | annotated_formula | lift( include ) }
+  private def TPTP_input = rule { typedef_formula | atom_def_formula | tff_annotated_formula | annotated_formula | lift( include ) }
 
   private def annotated_formula: Rule1[CtxTo[TptpInput]] = rule {
 
@@ -128,15 +154,17 @@ class TptpParser( val input: ParserInput ) extends Parser {
       ( ( lang: String, name: String, role: String, form: CtxTo[Formula], ann: Seq[CtxTo[GeneralTerm]] ) => ( ctx: Ctx ) => ( AnnotatedFormula( lang, name, role, form( ctx ), ann.map( _( ctx ) ) ) ) )
   }
 
-  //  TODO
-  // private def typedef_formula: Rule1[CtxTo[Typedef]] = rule {
-  //   atomic_word ~ "(" ~ Ws ~ name ~ Comma ~ Ws ~ "type" ~ Ws ~ Comma ~ Ws ~ atomic_word ~ Ws ~ ":" ~ Ws ~ ( name ) ~ annotations ~ ")." ~ Ws ~>
-  //     ( ( lang: String, name: String, typeName: String, ty: CtxTo[Ty], ann: Seq[CtxTo[GeneralTerm]] ) => ( ctx: Ctx ) => ( Typedef( lang, name, typeName, ty( ctx ), ann.map( _( ctx ) ) ) ) )
-  // }
+  //  tff(animal_type,type, animal: $tType ).
 
-  private def atom_def_formula: Rule1[CtxTo[Typedef]] = rule {
+  //  TODO
+  def typedef_formula: Rule1[CtxTo[TypeDef]] = rule {
+    atomic_word ~ "(" ~ Ws ~ name ~ Comma ~ Ws ~ "type" ~ Ws ~ Comma ~ Ws ~ atomic_word ~ Ws ~ ":" ~ Ws ~ "$tType" ~ Ws ~ annotations ~ ")." ~ Ws ~>
+      ( ( lang: String, name: String, typeName: String, ann: Seq[CtxTo[GeneralTerm]] ) => ( ctx: Ctx ) => ( TypeDef( lang, name, typeName, TBase( typeName ), ann.map( _( ctx ) ) ) ) )
+  }
+
+  private def atom_def_formula: Rule1[CtxTo[ConstDef]] = rule {
     atomic_word ~ "(" ~ Ws ~ name ~ Comma ~ Ws ~ "type" ~ Ws ~ Comma ~ Ws ~ atomic_word ~ Ws ~ ":" ~ Ws ~ tff_complex_type ~ annotations ~ ")." ~ Ws ~>
-      ( ( lang: String, name: String, typeName: String, ty: CtxTo[Ty], ann: Seq[CtxTo[GeneralTerm]] ) => ( ctx: Ctx ) => ( Typedef( lang, name, typeName, ty( ctx ), ann.map( _( ctx ) ) ) ) )
+      ( ( lang: String, name: String, varName: String, ty: CtxTo[Ty], ann: Seq[CtxTo[GeneralTerm]] ) => ( ctx: Ctx ) => ( ConstDef( lang, name, varName, Var( varName, ty( ctx ) ), ann.map( _( ctx ) ) ) ) )
   }
 
   private def tff_annotated_formula: Rule1[CtxTo[TptpInput]] = rule {
@@ -259,33 +287,6 @@ class TptpParser( val input: ParserInput ) extends Parser {
       } )
   }
 
-  private def tff_defined_complex_type: Rule1[CtxTo[Ty]] = rule { tff_mapping_type | tff_product_type | tff_basic_type }
-  private def tff_defined_mapping_type: Rule1[CtxTo[Ty]] = rule {
-    ( tff_basic_type | ( "(" ~ Ws ~ tff_product_type ~ Ws ~ ")" ) ) ~ Ws ~ ">" ~ Ws ~ tff_complex_type ~>
-      ( ( t: CtxTo[Ty], t2: CtxTo[Ty] ) =>
-        ( ctx: Ctx ) => {
-          expr.ty.TArr( ctx( t ), t2( ctx ) )
-        } )
-  }
-
-  private def tff_defined_product_type: Rule1[CtxTo[Ty]] = rule {
-    tff_basic_type ~ Ws ~ "*" ~ Ws ~ tff_complex_type ~> (
-      ( bt: CtxTo[Ty], ct: CtxTo[Ty] ) => ( ( ctx: Ctx ) => {
-        expr.ty.TArr( bt( ctx ), ct( ctx ) )
-      } ) )
-  }
-
-  // private def product_type = rule { root_type ~ ""}
-  private def tff_defined_basic_type: Rule1[CtxTo[Ty]] = rule {
-    atomic_word ~> ( ( name: String ) => ( ( ctx: Ctx ) =>
-      name match {
-        case "$o"     => To
-        case "$i"     => Ti
-        case "$tType" => TBase( "TODO" )
-        case name     => ctx.types.get( name ).getOrElse( throw new MalformedInputFileException( "Type (" + name + ") not defined in context" ) )
-      } ) )
-  }
-
   private def tff_complex_type: Rule1[CtxTo[Ty]] = rule { tff_mapping_type | tff_product_type | tff_basic_type }
   private def tff_mapping_type: Rule1[CtxTo[Ty]] = rule {
     ( tff_basic_type | ( "(" ~ Ws ~ tff_product_type ~ Ws ~ ")" ) ) ~ Ws ~ ">" ~ Ws ~ tff_complex_type ~>
@@ -308,7 +309,7 @@ class TptpParser( val input: ParserInput ) extends Parser {
       name match {
         case "$o" => To
         case "$i" => Ti
-        case name => ctx.types.get( name ).getOrElse( throw new MalformedInputFileException( "Type (" + name + ") not defined in context" ) )
+        case name => ctx.types.get( name ).getOrElse( throw new MalformedInputFileException( "Type (" + name + ") not defined in context; Known types: " + ctx.types ) )
       } ) )
   }
 

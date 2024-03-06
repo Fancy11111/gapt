@@ -25,7 +25,9 @@ package object tptp {
         Sequent() :+ formula
       case AnnotatedFormula( _, _, _, formula, _ ) =>
         formula +: Sequent()
-      case Typedef( _, _, _, _, _ ) =>
+      case TypeDef( _, _, _, _, _ ) =>
+        Sequent()
+      case ConstDef( _, _, _, _, _ ) =>
         Sequent()
       case in => throw new IllegalArgumentException( in.toString )
     } )
@@ -38,7 +40,9 @@ package object tptp {
           formula +: Sequent()
         case IncludeDirective( _, _ ) =>
           Sequent()
-        case Typedef( _, _, _, _, _ ) =>
+        case TypeDef( _, _, _, _, _ ) =>
+          Sequent()
+        case ConstDef( _, _, _, _, _ ) =>
           Sequent()
       } )
       val names = inputs.collect( {
@@ -55,7 +59,8 @@ package object tptp {
   }
   case class AnnotatedFormula( language: String, name: String, role: FormulaRole, formula: Formula, annotations: Seq[GeneralTerm] ) extends TptpInput
   case class IncludeDirective( fileName: String, formulaSelection: Option[Seq[String]] ) extends TptpInput
-  case class Typedef( lang: String, name: String, typeName: String, ty: Ty, annotations: Seq[GeneralTerm] ) extends TptpInput
+  case class TypeDef( lang: String, name: String, tyName: String, ty: Ty, annotations: Seq[GeneralTerm] ) extends TptpInput
+  case class ConstDef( lang: String, name: String, varName: String, v: Var, annotations: Seq[GeneralTerm] ) extends TptpInput
 
   object TptpTerm {
     def apply( sym: String, args: Seq[Expr] ): Expr =

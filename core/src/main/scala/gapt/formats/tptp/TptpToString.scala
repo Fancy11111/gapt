@@ -28,8 +28,10 @@ object TptpToString {
       //TODO: check what seq actually contains
       val args = seq.map( single_quoted ).mkString( "[", ", ", "]" )
       s"include(${single_quoted( fileName )}, ${args}).\n"
-    case Typedef( lang, name, typeName, t, annots ) =>
+    case TypeDef( lang, name, typeName, t, annots ) =>
       s"${atomic_word( lang )}(${atomic_word( name )}, type, ${atomic_word( typeName )}: ${t}${annotations( annots )}). \n"
+    case ConstDef( lang, name, varName, v, annots ) =>
+      s"${atomic_word( lang )}(${atomic_word( name )}, type, ${atomic_word( varName )}: ${v}${annotations( annots )}). \n"
   }
 
   def annotations( annots: Seq[Expr] ): String = annots.map( expression ).map( ", " + _ ).mkString
