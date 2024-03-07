@@ -84,7 +84,7 @@ package object tptp {
   def TptpAtom( sym: String, args: Seq[Expr], ctx: Ctx ): Atom = {
 
     ( sym, args ) match {
-      case _ => Apps( Const( sym, ctx.vars.get( sym ).getOrElse( throw new RuntimeException() ).ty ), args ).asInstanceOf[Atom]
+      case _ => Apps( Const( sym, ctx.vars.get( sym ).getOrElse( throw new RuntimeException( "var with name " + sym + " not found" ) ).ty ), args ).asInstanceOf[Atom]
     }
   }
 
