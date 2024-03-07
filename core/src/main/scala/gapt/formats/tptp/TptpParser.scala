@@ -22,6 +22,7 @@ import gapt.expr.ty.TBase
 import gapt.expr.ty.Ti
 import gapt.expr.ty.To
 import gapt.expr.ty.Ty
+import gapt.expr.ty.->:
 
 import scala.util.{ Failure, Success }
 import gapt.formats.tptp.GeneralTerm
@@ -103,6 +104,9 @@ object Ctx {
   }
 
 }
+
+// object TNum extends TBase("$num", List())
+
 
 class TptpParser( val input: ParserInput ) extends Parser {
   import CharPredicate._
@@ -292,7 +296,7 @@ class TptpParser( val input: ParserInput ) extends Parser {
     ( tff_basic_type | ( "(" ~ Ws ~ tff_product_type ~ Ws ~ ")" ) ) ~ Ws ~ ">" ~ Ws ~ tff_complex_type ~>
       ( ( t: CtxTo[Ty], t2: CtxTo[Ty] ) =>
         ( ctx: Ctx ) => {
-          expr.ty.TArr( ctx( t ), t2( ctx ) )
+          fixCurrying( ctx( t ), t2( ctx ) )
         } )
   }
 
@@ -309,6 +313,9 @@ class TptpParser( val input: ParserInput ) extends Parser {
       name match {
         case "$o" => To
         case "$i" => Ti
+        // case "$real" => NumTy
+        // case "$rat" => NumTy
+        // case "$int" => NumTy
         case name => ctx.types.get( name ).getOrElse( throw new MalformedInputFileException( "Type (" + name + ") not defined in context; Known types: " + ctx.types ) )
       } ) )
   }
@@ -355,6 +362,13 @@ class TptpParser( val input: ParserInput ) extends Parser {
 
   private def lift[A]( inner: Rule1[A] ): Rule1[CtxTo[A]] = {
     rule { inner ~> ( ( res: A ) => Ctx.mReturn( res ) ) }
+  }
+
+  private def fixCurrying( in: Ty, out: Ty ): Ty = {
+    in match {
+      case i ->: o => expr.ty.TArr( i, fixCurrying( o, out ) )
+      case _       => expr.ty.TArr( in, out )
+    }
   }
 }
 
