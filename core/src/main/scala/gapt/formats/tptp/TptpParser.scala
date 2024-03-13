@@ -107,7 +107,6 @@ object Ctx {
 
 // object TNum extends TBase("$num", List())
 
-
 class TptpParser( val input: ParserInput ) extends Parser {
   import CharPredicate._
 
@@ -258,26 +257,27 @@ class TptpParser( val input: ParserInput ) extends Parser {
   }
   private def tff_unary_formula = rule { "~" ~ Ws ~ tff_unitary_formula ~> ( f => ( ctx: Ctx ) => Neg( f( ctx ) ) ) }
 
-  private def tff_atomic_formula = rule { lift( defined_prop ) | tff_infix_formula | tff_plain_atomic_formula | ( distinct_object ~> ( ( o: String ) => Ctx.mReturn( FOLAtom( o ) ) ) ) }
+  private def tff_atomic_formula = rule { lift( defined_prop ) | tff_infix_formula | tff_defined_predicate_formula | tff_plain_atomic_formula | ( distinct_object ~> ( ( o: String ) => Ctx.mReturn( FOLAtom( o ) ) ) ) }
+  private def tff_defined_predicate_formula = rule {
+    tff_defined_predicate ~ "(" ~ Ws ~ tff_term ~ Comma ~ tff_term ~ Ws ~ ")" ~> ( ( p, a, b ) => ( ctx: Ctx ) => p( a( ctx ), b( ctx ) ) )
+  }
+
+  private def tff_defined_predicate = rule {
+    ( "$less" ~ Ws ~> ( () => ( a: Expr, b: Expr ) => Eq( a, b ) ) ) |
+      ( "$greatereq" ~ Ws ~> ( () => ( a: Expr, b: Expr ) => Eq( a, b ) ) )
+  }
+
   private def tff_plain_atomic_formula = rule { atomic_word ~ ( "(" ~ Ws ~ tff_arguments ~ ")" ~ Ws ).? ~> ( ( p: String, as: Option[Seq[Ctx => Expr]] ) => ( ctx: Ctx ) => TptpAtom( p, as.map( ctx( _ ) ).getOrElse( Seq() ), ctx ) ) }
   private def tff_infix_formula = rule { tff_term ~ ( "=" ~ Ws ~ tff_term ~> ( ( a: CtxTo[Expr], b ) => ( ctx: Ctx ) => Eq( a( ctx ): Expr, b( ctx ) ) ) | "!=" ~ Ws ~ tff_term ~> ( ( a: CtxTo[Expr], b ) => ( ctx: Ctx ) => ( a( ctx ): Expr ) !== b( ctx ) ) ) }
 
-  private def tff_term: Rule1[CtxTo[Expr]] = rule { tff_variable | ( distinct_object ~> ( d => Ctx.mReturn( FOLConst( d ) ) ) ) | ( number ~> ( n => Ctx.mReturn( FOLConst( n ) ) ) ) | tff_function_term }
+  private def tff_term: Rule1[CtxTo[Expr]] = rule { tff_variable | ( distinct_object ~> ( d => Ctx.mReturn( FOLConst( d ) ) ) ) | ( number ~> ( n => Ctx.mReturn( FOLConst( n ) ) ) ) | tff_defined_function_term | tff_function_term }
   private def tff_function_term: Rule1[CtxTo[Expr]] = rule { name ~ ( "(" ~ Ws ~ tff_term.+.separatedBy( Comma ) ~ ")" ~ Ws ).? ~> ( ( hd: String, as: Option[Seq[CtxTo[Expr]]] ) => ( ( ctx: Ctx ) => TptpTerm( hd, as.getOrElse( Seq() ), ctx ) ) ) }
+  private def tff_defined_function_term: Rule1[CtxTo[Expr]] = rule {
+    ( "$uminus" ~ "(" ~ Ws ~ tff_term ~ Ws ~ ")" ~ Ws ) ~> ( ( as: CtxTo[Expr] ) => ( ( ctx: Ctx ) => TptpTerm( "$uminus", as( ctx ) ) ) ) |
+      ( "$difference" ~ "(" ~ Ws ~ tff_term ~ Comma ~ tff_term ~ Ws ~ ")" ~ Ws ) ~> ( ( a: CtxTo[Expr], b: CtxTo[Expr] ) => ( ( ctx: Ctx ) => TptpTerm( "$differenceTest", Seq( a( ctx ), b( ctx ) ) ) ) )
+  }
 
   private def tff_arguments: Rule1[Seq[Ctx => Expr]] = rule { tff_term.+.separatedBy( Comma ) }
-
-  // private def tff_general_list: Rule1[Seq[Expr]] = rule { "[" ~ Ws ~ tff_general_term.*.separatedBy( Comma ) ~ "]" ~ Ws }
-  // private def tff_general_terms = rule { tff_general_term.+.separatedBy( Comma ) }
-  // private def tff_general_term: Rule1[Expr] = rule {
-  //   tff_general_data ~ ( ":" ~ Ws ~ tff_general_term ).? ~> ( ( d, to ) => to.fold( d )( t => GeneralColon( d, t ) ) ) |
-  //     tff_general_list ~> ( GeneralList( _: Seq[Expr] ) )
-  // }
-  //
-  // private def tff_general_data: Rule1[Expr] = rule {
-  //   formula_data | general_function | atomic_word ~> ( FOLConst( _ ) ) |
-  //     variable | ( number ~> ( FOLConst( _ ) ) ) | ( distinct_object ~> ( FOLConst( _ ) ) )
-  // }
 
   private def tff_general_function = rule { atomic_word ~ "(" ~ Ws ~ general_terms ~ ")" ~ Ws ~> ( ( n: String, gt: Seq[CtxTo[Expr]] ) => ( ctx: Ctx ) => TptpTerm( n, gt.map( _( ctx ) ) ) ) }
 
@@ -311,12 +311,15 @@ class TptpParser( val input: ParserInput ) extends Parser {
   private def tff_basic_type: Rule1[CtxTo[Ty]] = rule {
     atomic_word ~> ( ( name: String ) => ( ( ctx: Ctx ) =>
       name match {
-        case "$o" => To
-        case "$i" => Ti
+        case "$o"    => To
+        case "$i"    => Ti
+        case "$real" => TBase( "real" )
+        case "$rat"  => TBase( "rat" )
+        case "$int"  => TBase( "int" )
         // case "$real" => NumTy
         // case "$rat" => NumTy
         // case "$int" => NumTy
-        case name => ctx.types.get( name ).getOrElse( throw new MalformedInputFileException( "Type (" + name + ") not defined in context; Known types: " + ctx.types ) )
+        case name    => ctx.types.get( name ).getOrElse( throw new MalformedInputFileException( "Type (" + name + ") not defined in context; Known types: " + ctx.types ) )
       } ) )
   }
 
