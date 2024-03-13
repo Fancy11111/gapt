@@ -8,6 +8,7 @@ import gapt.expr
 import gapt.expr.formula.And
 import gapt.expr.formula.Bottom
 import gapt.expr.formula.Eq
+import gapt.expr.formula.GreaterEq
 import gapt.expr.formula.Ex
 import gapt.expr.formula.Formula
 import gapt.expr.formula.Imp
@@ -263,8 +264,11 @@ class TptpParser( val input: ParserInput ) extends Parser {
   }
 
   private def tff_defined_predicate = rule {
-    ( "$less" ~ Ws ~> ( () => ( a: Expr, b: Expr ) => Eq( a, b ) ) ) |
-      ( "$greatereq" ~ Ws ~> ( () => ( a: Expr, b: Expr ) => Eq( a, b ) ) )
+    ( "$less" ~ Ws ~> ( () => ( a: Expr, b: Expr ) => -( GreaterEq( a, b ) ) ) ) |
+      ( "$greatereq" ~ Ws ~> ( () => ( a: Expr, b: Expr ) => GreaterEq( a, b ) ) ) |
+      ( "$greater" ~ Ws ~> ( () => ( a: Expr, b: Expr ) => -( GreaterEq( b, a ) ) ) ) |
+      ( "$lesseq" ~ Ws ~> ( () => ( a: Expr, b: Expr ) => GreaterEq( b, a ) ) )
+
   }
 
   private def tff_plain_atomic_formula = rule { atomic_word ~ ( "(" ~ Ws ~ tff_arguments ~ ")" ~ Ws ).? ~> ( ( p: String, as: Option[Seq[Ctx => Expr]] ) => ( ctx: Ctx ) => TptpAtom( p, as.map( ctx( _ ) ).getOrElse( Seq() ), ctx ) ) }
@@ -273,8 +277,19 @@ class TptpParser( val input: ParserInput ) extends Parser {
   private def tff_term: Rule1[CtxTo[Expr]] = rule { tff_variable | ( distinct_object ~> ( d => Ctx.mReturn( FOLConst( d ) ) ) ) | ( number ~> ( n => Ctx.mReturn( FOLConst( n ) ) ) ) | tff_defined_function_term | tff_function_term }
   private def tff_function_term: Rule1[CtxTo[Expr]] = rule { name ~ ( "(" ~ Ws ~ tff_term.+.separatedBy( Comma ) ~ ")" ~ Ws ).? ~> ( ( hd: String, as: Option[Seq[CtxTo[Expr]]] ) => ( ( ctx: Ctx ) => TptpTerm( hd, as.getOrElse( Seq() ), ctx ) ) ) }
   private def tff_defined_function_term: Rule1[CtxTo[Expr]] = rule {
-    ( "$uminus" ~ "(" ~ Ws ~ tff_term ~ Ws ~ ")" ~ Ws ) ~> ( ( as: CtxTo[Expr] ) => ( ( ctx: Ctx ) => TptpTerm( "$uminus", as( ctx ) ) ) ) |
-      ( "$difference" ~ "(" ~ Ws ~ tff_term ~ Comma ~ tff_term ~ Ws ~ ")" ~ Ws ) ~> ( ( a: CtxTo[Expr], b: CtxTo[Expr] ) => ( ( ctx: Ctx ) => TptpTerm( "$differenceTest", Seq( a( ctx ), b( ctx ) ) ) ) )
+    ( "$uminus" ~ "(" ~ Ws ~ tff_term ~ Ws ~ ")" ~ Ws ) ~> ( ( as: CtxTo[Expr] ) => ( ( ctx: Ctx ) => {
+      val a = as( ctx )
+      // TODO: maybe num type?
+      TptpTerm( "$uminus", Seq( a ), a.ty )
+    } ) ) |
+      ( "$difference" ~ "(" ~ Ws ~ tff_term ~ Comma ~ tff_term ~ Ws ~ ")" ~ Ws ) ~> ( ( a: CtxTo[Expr], b: CtxTo[Expr] ) => ( ( ctx: Ctx ) => {
+        val aFromCtx = a( ctx )
+        val bFromCtx = b( ctx )
+        if ( aFromCtx.ty != bFromCtx.ty ) {
+          throw new IllegalArgumentException( "type mismatch: $difference expects two params of same type, got a: " + aFromCtx.ty + ", b: " + bFromCtx.ty )
+        }
+        TptpTerm( "$differenceTest", Seq( aFromCtx, bFromCtx ), aFromCtx.ty )
+      } ) )
   }
 
   private def tff_arguments: Rule1[Seq[Ctx => Expr]] = rule { tff_term.+.separatedBy( Comma ) }
