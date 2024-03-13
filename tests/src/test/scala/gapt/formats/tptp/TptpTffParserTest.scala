@@ -100,6 +100,71 @@ class TptpTffParserTest extends Specification {
       }
       ok
     }
+
+    "Should fail type mismatch: ! [A: $int, B: $real] : $less($difference(A,B), $difference(B,A))" in {
+
+      val parser = new TptpParser( "! [A: $int, B: $real] : $less($difference(A,B), $difference(B,A))" )
+      val l = parser.tff_quantified_formula.run()
+      l match {
+        case Success( value ) => {
+          try {
+            value( Ctx( Ctx(), "a", Var( "a", gapt.expr.ty.TArr( Ti, To ) ) ) )
+            failure
+          } catch {
+            case e: IllegalArgumentException => {
+              println( e.getMessage() )
+              ok
+            }
+            case e: Exception => {
+              println( e )
+              failure
+            }
+          }
+        }
+        case Failure( e: ParseError ) => {
+          println( parser.formatError( e, new ErrorFormatter( showTraces = true ) ) )
+          failure
+        }
+        case Failure( exception ) => {
+          println( "cause" )
+          failure
+        }
+      }
+      ok
+    }
+
+    "Should fail type mismatch: ? [A: $int, B: $real] : $less(A,B)" in {
+
+      val parser = new TptpParser( "? [A: $int, B: $real] : $greatereq(A,B)" )
+      val l = parser.tff_quantified_formula.run()
+      l match {
+        case Success( value ) => {
+          try {
+            value( Ctx( Ctx(), "a", Var( "a", gapt.expr.ty.TArr( Ti, To ) ) ) )
+            failure
+          } catch {
+            case e: IllegalArgumentException => {
+              println( e.getMessage() )
+              ok
+            }
+            case e: Exception => {
+              println( e )
+              failure
+            }
+          }
+        }
+        case Failure( e: ParseError ) => {
+          println( parser.formatError( e, new ErrorFormatter( showTraces = true ) ) )
+          failure
+        }
+        case Failure( exception ) => {
+          println( "cause" )
+          failure
+        }
+      }
+      ok
+    }
+
   }
 
   "test files" >> {
@@ -108,13 +173,11 @@ class TptpTffParserTest extends Specification {
       file_name in
         {
           val file = ClasspathInputFile( file_name )
-          println( file_name )
           val parser = new TptpParser( file.read )
           val res = parser.TPTP_file.run()
           res match {
             case Success( value ) => {
               val interpreted = value( new Ctx( Map(), Map() ) )
-              // println( interpreted )
               ok
             }
             case Failure( e: ParseError ) => {
