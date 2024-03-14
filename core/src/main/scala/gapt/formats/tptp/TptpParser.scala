@@ -8,7 +8,7 @@ import gapt.expr
 import gapt.expr.formula.And
 import gapt.expr.formula.Bottom
 import gapt.expr.formula.Eq
-import gapt.expr.formula.GreaterEq
+import gapt.logic.fol.arithmetic.GreaterEq
 import gapt.expr.formula.Ex
 import gapt.expr.formula.Formula
 import gapt.expr.formula.Imp
@@ -31,6 +31,9 @@ import org.parboiled2.support.hlist
 import org.parboiled2.support.hlist.HNil
 import gapt.formats.tptp.statistics.ParsingError
 import gapt.formats.tptp.TptpFile
+import gapt.logic.fol.arithmetic.TReal
+import gapt.logic.fol.arithmetic.TRat
+import gapt.logic.fol.arithmetic.TInt
 
 class Ctx( val vars: Map[String, Var], val types: Map[String, Ty] ) {
 
@@ -280,6 +283,7 @@ class TptpParser( val input: ParserInput ) extends Parser {
     ( "$uminus" ~ "(" ~ Ws ~ tff_term ~ Ws ~ ")" ~ Ws ) ~> ( ( as: CtxTo[Expr] ) => ( ( ctx: Ctx ) => {
       val a = as( ctx )
       // TODO: maybe num type?
+      // a.ty in (real, rat, int)
       TptpTerm( "$uminus", Seq( a ), a.ty )
     } ) ) |
       ( "$difference" ~ "(" ~ Ws ~ tff_term ~ Comma ~ tff_term ~ Ws ~ ")" ~ Ws ) ~> ( ( a: CtxTo[Expr], b: CtxTo[Expr] ) => ( ( ctx: Ctx ) => {
@@ -288,7 +292,7 @@ class TptpParser( val input: ParserInput ) extends Parser {
         if ( aFromCtx.ty != bFromCtx.ty ) {
           throw new IllegalArgumentException( "type mismatch: $difference expects two params of same type, got a: " + aFromCtx.ty + ", b: " + bFromCtx.ty )
         }
-        TptpTerm( "$differenceTest", Seq( aFromCtx, bFromCtx ), aFromCtx.ty )
+        TptpTerm( "$difference", Seq( aFromCtx, bFromCtx ), aFromCtx.ty )
       } ) )
   }
 
@@ -328,9 +332,9 @@ class TptpParser( val input: ParserInput ) extends Parser {
       name match {
         case "$o"    => To
         case "$i"    => Ti
-        case "$real" => TBase( "real" )
-        case "$rat"  => TBase( "rat" )
-        case "$int"  => TBase( "int" )
+        case "$real" => TReal 
+        case "$rat"  => TRat
+        case "$int"  => TInt 
         // case "$real" => NumTy
         // case "$rat" => NumTy
         // case "$int" => NumTy

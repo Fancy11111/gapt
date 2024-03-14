@@ -64,7 +64,7 @@ package object tptp {
 
   object TptpTerm {
     def apply( sym: String, args: Seq[Expr] ): Expr =
-      Apps( Const( sym, FunctionType( Ti, args.map( _.ty ) ) ), args ) // TODO: add optional ctx lookup
+      TptpTerm( sym, args, Ti )
     def apply( sym: String, args: Seq[Expr], out: Ty ): Expr =
       Apps( Const( sym, FunctionType( out, args.map( _.ty ) ) ), args ) // TODO: add optional ctx lookup
     def apply( sym: String, args: Expr* )( implicit dummyImplicit: DummyImplicit ): Expr =
