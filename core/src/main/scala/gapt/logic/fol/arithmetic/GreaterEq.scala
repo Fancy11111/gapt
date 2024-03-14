@@ -1,4 +1,4 @@
-package gapt.expr.formula
+package gapt.logic.fol.arithmetic
 import gapt.expr.formula.constants.GreaterEqC
 import gapt.expr.Apps
 import gapt.expr.formula.fol.FOLAtom
@@ -7,6 +7,11 @@ import gapt.expr.formula.fol.FOLTerm
 import gapt.expr
 import gapt.expr.formula.fol.FOLExpression
 import gapt.expr.formula.fol.FOLFormula
+import gapt.expr.formula._
+
+// >=
+// =<
+// ->:
 
 object GreaterEq {
   def apply( a: Expr, b: Expr ): Atom = Apps( GreaterEqC( a.ty ), a, b ).asInstanceOf[Atom]
