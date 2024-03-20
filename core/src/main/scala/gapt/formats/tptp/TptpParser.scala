@@ -34,6 +34,9 @@ import gapt.formats.tptp.TptpFile
 import gapt.logic.fol.arithmetic.TReal
 import gapt.logic.fol.arithmetic.TRat
 import gapt.logic.fol.arithmetic.TInt
+import gapt.logic.fol.arithmetic.Lesser
+import gapt.logic.fol.arithmetic.Greater
+import gapt.logic.fol.arithmetic.LesserEq
 
 class Ctx( val vars: Map[String, Var], val types: Map[String, Ty] ) {
 
@@ -267,10 +270,10 @@ class TptpParser( val input: ParserInput ) extends Parser {
   }
 
   private def tff_defined_predicate = rule {
-    ( "$less" ~ Ws ~> ( () => ( a: Expr, b: Expr ) => -( GreaterEq( a, b ) ) ) ) |
+    ( "$less" ~ Ws ~> ( () => ( a: Expr, b: Expr ) => Lesser( a, b ) ) ) |
       ( "$greatereq" ~ Ws ~> ( () => ( a: Expr, b: Expr ) => GreaterEq( a, b ) ) ) |
-      ( "$greater" ~ Ws ~> ( () => ( a: Expr, b: Expr ) => -( GreaterEq( b, a ) ) ) ) |
-      ( "$lesseq" ~ Ws ~> ( () => ( a: Expr, b: Expr ) => GreaterEq( b, a ) ) )
+      ( "$greater" ~ Ws ~> ( () => ( a: Expr, b: Expr ) => Greater( a, b ) ) ) |
+      ( "$lesseq" ~ Ws ~> ( () => ( a: Expr, b: Expr ) => LesserEq( a, b ) ) )
 
   }
 
@@ -332,9 +335,9 @@ class TptpParser( val input: ParserInput ) extends Parser {
       name match {
         case "$o"    => To
         case "$i"    => Ti
-        case "$real" => TReal 
+        case "$real" => TReal
         case "$rat"  => TRat
-        case "$int"  => TInt 
+        case "$int"  => TInt
         // case "$real" => NumTy
         // case "$rat" => NumTy
         // case "$int" => NumTy
