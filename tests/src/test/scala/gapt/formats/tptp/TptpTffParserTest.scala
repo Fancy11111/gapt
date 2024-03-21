@@ -57,7 +57,8 @@ class TptpTffParserTest extends Specification {
       ( "(![X:$i] : p(X)) | (?[X:$o]: q(X))", new Ctx( Map( "p" -> Var( "p", gapt.expr.ty.TArr( Ti, To ) ), "q" -> Var( "q", gapt.expr.ty.TArr( To, To ) ) ), Map() ), ( p: TptpParser ) => ( p.tff_logic_formula.run() ) ),
       ( "![X:$i] : (p(X) & ![X:$o] : q(X))", new Ctx( Map( "p" -> Var( "p", gapt.expr.ty.TArr( Ti, To ) ), "q" -> Var( "q", gapt.expr.ty.TArr( To, To ) ) ), Map() ), ( p: TptpParser ) => ( p.tff_logic_formula.run() ) ),
       ( "![X:$i] : (![X:$o] : q(X)  => p(X) )", new Ctx( Map( "p" -> Var( "p", gapt.expr.ty.TArr( Ti, To ) ), "q" -> Var( "q", gapt.expr.ty.TArr( To, To ) ) ), Map() ), ( p: TptpParser ) => ( p.tff_logic_formula.run() ) ),
-      ( "! [A: $i > $o,B:$i,C:$i*$o,D:$o] : a(B)", Ctx( Ctx(), "a", Var( "a", gapt.expr.ty.TArr( Ti, To ) ) ), ( p: TptpParser ) => ( p.tff_quantified_formula.run() ) ) ) ) {
+      ( "! [A: $i > $o,B:$i,C:$i*$o,D:$o] : a(B)", Ctx( Ctx(), "a", Var( "a", gapt.expr.ty.TArr( Ti, To ) ) ), ( p: TptpParser ) => ( p.tff_quantified_formula.run() ) ),
+      ( "! [A: $int,B:$int] : $less($uminus(A), B)", Ctx(), ( p: TptpParser ) => ( p.tff_quantified_formula.run() ) ) ) ) {
       case ( exp, ctx, pRun ) =>
         exp in {
           val parser = new TptpParser( exp )
