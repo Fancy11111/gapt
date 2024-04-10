@@ -89,10 +89,8 @@ object Ctx {
   def apply( ctx: Ctx, addVars: Seq[Var] ): Ctx = {
     ctx match {
       case Ctx( vars, types ) => {
-        Ctx( vars ++ addVars.map( v => {
-          v match {
-            case Var( name, ty ) => ( name, Var( name, ty ) )
-          }
+        Ctx( vars ++ ( addVars map {
+          case Var( name, ty ) => ( name, Var( name, ty ) )
         } ).toMap, types )
       }
     }
@@ -257,9 +255,9 @@ class TptpParser( val input: ParserInput ) extends Parser {
   private def tff_and_formula_part = rule { ( "&" ~ Ws ~ tff_unitary_formula ).+ ~> ( ( a: CtxTo[Formula], as: Seq[CtxTo[Formula]] ) => ( ctx: Ctx ) => And.leftAssociative( a( ctx ) +: ctx( as ): _* ) ) }
   private def tff_unitary_formula: Rule1[CtxTo[Formula]] = rule { tff_quantified_formula | tff_unary_formula | tff_atomic_formula | "(" ~ Ws ~ tff_logic_formula ~ ")" ~ Ws }
   def tff_quantified_formula = rule {
-    fol_quantifier ~ "[" ~ Ws ~ tff_variable_list ~ "]" ~ Ws ~ ":" ~ Ws ~ tff_unitary_formula ~> ( ( q: QuantifierHelper, vs, m ) => ( ctx: Ctx ) => {
-      val vars = vs.map( _( ctx ) )
-      q.Block( vs.map( _( ctx ) ), m( Ctx( ctx, vars ) ) )
+    fol_quantifier ~ "[" ~ Ws ~ tff_variable_list ~ "]" ~ Ws ~ ":" ~ Ws ~ tff_unitary_formula ~> ( ( q: QuantifierHelper, variable_list, formula ) => ( ctx: Ctx ) => {
+      val vars = variable_list.map( _( ctx ) )
+      q.Block( vars, formula( Ctx( ctx, vars ) ) )
     } )
   }
   private def tff_unary_formula = rule { "~" ~ Ws ~ tff_unitary_formula ~> ( f => ( ctx: Ctx ) => Neg( f( ctx ) ) ) }
