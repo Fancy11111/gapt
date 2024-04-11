@@ -284,14 +284,21 @@ class TptpParser( val input: ParserInput ) extends Parser {
     ( "$uminus" ~ "(" ~ Ws ~ tff_term ~ Ws ~ ")" ~ Ws ) ~> ( ( as: CtxTo[Expr] ) => ( ( ctx: Ctx ) => {
       val a = as( ctx )
       // TODO: maybe num type?
-      // a.ty in (real, rat, int)
+      if ( !( a.ty == TInt || a.ty == TReal || a.ty == TRat ) ) {
+        throw new IllegalArgumentException( "$uminus expects a numeric type (TInt, TReal, TRat), got " + a.ty + ", " + ( a.ty == TInt ) )
+      }
       TptpTerm( "$uminus", Seq( a ), a.ty )
+      // a.ty in (real, rat, int)
     } ) ) |
       ( "$difference" ~ "(" ~ Ws ~ tff_term ~ Comma ~ tff_term ~ Ws ~ ")" ~ Ws ) ~> ( ( a: CtxTo[Expr], b: CtxTo[Expr] ) => ( ( ctx: Ctx ) => {
         val aFromCtx = a( ctx )
         val bFromCtx = b( ctx )
         if ( aFromCtx.ty != bFromCtx.ty ) {
           throw new IllegalArgumentException( "type mismatch: $difference expects two params of same type, got a: " + aFromCtx.ty + ", b: " + bFromCtx.ty )
+        }
+        val aTy = aFromCtx.ty
+        if ( !( aTy == TInt || aTy == TReal || aTy == TRat ) ) {
+          throw new IllegalArgumentException( "$difference expects numeric types (TInt, TReal, TRat), got " + aTy )
         }
         TptpTerm( "$difference", Seq( aFromCtx, bFromCtx ), aFromCtx.ty )
       } ) )
@@ -336,9 +343,6 @@ class TptpParser( val input: ParserInput ) extends Parser {
         case "$real" => TReal
         case "$rat"  => TRat
         case "$int"  => TInt
-        // case "$real" => NumTy
-        // case "$rat" => NumTy
-        // case "$int" => NumTy
         case name    => ctx.types.get( name ).getOrElse( throw new MalformedInputFileException( "Type (" + name + ") not defined in context; Known types: " + ctx.types ) )
       } ) )
   }
