@@ -169,7 +169,7 @@ class TptpTffParserTest extends Specification {
 
   "test files" >> {
 
-    Fragments.foreach( Seq( "TF0.p", "ANA134_tff_fragment.p" ) ) { file_name =>
+    Fragments.foreach( Seq( "TF0.p", "ANA134_tff_fragment.p", "TF0_typed_and_untyped_variables.p", "TF0_typed_and_untyped_variables_shadowing.p" ) ) { file_name =>
       file_name in
         {
           val file = ClasspathInputFile( file_name )

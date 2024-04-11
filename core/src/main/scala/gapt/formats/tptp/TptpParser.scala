@@ -301,13 +301,13 @@ class TptpParser( val input: ParserInput ) extends Parser {
 
   private def tff_general_function = rule { atomic_word ~ "(" ~ Ws ~ general_terms ~ ")" ~ Ws ~> ( ( n: String, gt: Seq[CtxTo[Expr]] ) => ( ctx: Ctx ) => TptpTerm( n, gt.map( _( ctx ) ) ) ) }
 
-  def tff_variable_list: Rule1[Seq[Ctx => Var]] = rule { ( ( tff_typed_variable | tff_variable ) ~> ( ( v: CtxTo[Var] ) => ( ctx: Ctx ) => ( v( ctx ) ) ) ).+.separatedBy( Comma ) }
+  def tff_variable_list: Rule1[Seq[Ctx => Var]] = rule { ( ( tff_typed_variable | lift( variable ) ) ).+.separatedBy( Comma ) }
   private def tff_typed_variable = rule { capture( upper_word ) ~ Ws ~ ":" ~ Ws ~ tff_complex_type ~> ( ( name, t ) => ( ( ctx: Ctx ) => Var( name, t( ctx ) ) ) ) }
   private def tff_variable: Rule1[( Ctx ) => Var] = rule {
     capture( upper_word ) ~ Ws ~> ( ( n: String ) => ( ctx: Ctx ) =>
       {
         // TODO: are all variables necessarily quantified
-        ctx.vars.get( n ).getOrElse( Var( n, To ) )
+        ctx.vars.get( n ).getOrElse( Var( n, Ti ) )
       } )
   }
 
