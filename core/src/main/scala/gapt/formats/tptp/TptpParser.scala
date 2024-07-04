@@ -130,23 +130,18 @@ class TptpParser( val input: ParserInput ) extends Parser {
   def TPTP_file: Rule1[CtxTo[TptpFile]] = rule {
     Ws ~ TPTP_input.* ~ EOI ~> ( ( seq: Seq[CtxTo[TptpInput]] ) => ( ctx: Ctx ) =>
       seq.foldLeft( ( ctx, Seq[TptpInput]() ) ) {
-        ( acc, ctxToFormula ) =>
-          acc match {
-            case ( c, s ) => {
-              val formula = ctxToFormula( c )
-              formula match {
-                case TypeDef( _, _, name, ty, o ) => {
-                  ( Ctx( c, name, ty ), s :+ formula )
-                }
-                case ConstDef( _, _, name, v, _ ) => {
-                  ( Ctx( c, name, v ), s :+ formula )
-                }
-                case other => {
-                  ( c, s :+ other )
-                }
-              }
-            }
+        (acc, contextLookup) =>
+          val (acc_ctx, acc_inputs) = acc
+          val tptp_input = contextLookup(acc_ctx)
+          tptp_input match {
+            case TypeDef(_, _, name, ty, _) =>
+              (Ctx(acc_ctx, name, ty), acc_inputs :+ tptp_input)
+            case ConstDef(_, _, name, v, _) =>
+              (Ctx(acc_ctx, name, v), acc_inputs :+ tptp_input)
+            case other => // Formula or include directive
+              (acc_ctx, acc_inputs :+ other)
           }
+
       } match {
         case ( _, formulas ) => TptpFile( formulas )
       } )
