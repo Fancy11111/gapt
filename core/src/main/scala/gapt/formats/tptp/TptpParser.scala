@@ -58,11 +58,6 @@ class Ctx( val vars: Map[String, Var], val types: Map[String, Ty] ) {
     to( this )
   }
 }
-//
-
-// trait CtxTo[A] {
-//   def apply(ctx: Ctx): A
-// }
 
 object Ctx {
 
@@ -79,34 +74,30 @@ object Ctx {
   }
 
   def apply( ctx: Ctx, name: String, v: Var ): Ctx = {
-    ctx match {
-      case Ctx( vars, types ) => {
-        Ctx( vars + ( name -> v ), types )
-      }
-    }
+    Ctx( ctx.vars + ( name -> v ), ctx.types )
   }
 
   def apply( ctx: Ctx, addVars: Seq[Var] ): Ctx = {
-    ctx match {
-      case Ctx( vars, types ) => {
-        Ctx( vars ++ ( addVars map {
-          case Var( name, ty ) => ( name, Var( name, ty ) )
-        } ).toMap, types )
-      }
-    }
+    Ctx( ctx.vars ++ ( addVars map {
+      case Var( name, ty ) => ( name, Var( name, ty ) )
+    } ).toMap, ctx.types )
   }
 
   def apply( ctx: Ctx, name: String, t: Ty ): Ctx = {
-    ctx match {
-      case Ctx( vars, types ) => {
-        Ctx( vars, types + ( name -> t ) )
-      }
-    }
+    Ctx( ctx.vars, ctx.types + ( name -> t ) )
   }
 
   def apply(): Ctx = {
     new Ctx( Map.empty[String, Var], Map.empty[String, Ty] )
   }
+
+  val default = new Ctx(
+    Map(),
+    Map(
+      "$real" -> TReal,
+      "$int" -> TInt,
+      "$rat" -> TRat,
+      "$tType" -> TBase( "$tType" ) ) )
 
 }
 
@@ -130,22 +121,21 @@ class TptpParser( val input: ParserInput ) extends Parser {
   def TPTP_file: Rule1[CtxTo[TptpFile]] = rule {
     Ws ~ TPTP_input.* ~ EOI ~> ( ( seq: Seq[CtxTo[TptpInput]] ) => ( ctx: Ctx ) =>
       seq.foldLeft( ( ctx, Seq[TptpInput]() ) ) {
-        (acc, contextLookup) =>
-          val (acc_ctx, acc_inputs) = acc
-          val tptp_input = contextLookup(acc_ctx)
+        ( acc, contextLookup ) =>
+          val ( acc_ctx, acc_inputs ) = acc
+          val tptp_input = contextLookup( acc_ctx )
           tptp_input match {
-            case TypeDef(_, _, name, ty, _) =>
-              (Ctx(acc_ctx, name, ty), acc_inputs :+ tptp_input)
-            case ConstDef(_, _, name, v, _) =>
-              (Ctx(acc_ctx, name, v), acc_inputs :+ tptp_input)
+            case TypeDef( _, _, name, ty, _ ) =>
+              ( Ctx( acc_ctx, name, ty ), acc_inputs :+ tptp_input )
+            case ConstDef( _, _, name, v, _ ) =>
+              ( Ctx( acc_ctx, name, v ), acc_inputs :+ tptp_input )
             case other => // Formula or include directive
-              (acc_ctx, acc_inputs :+ other)
+              ( acc_ctx, acc_inputs :+ other )
           }
 
       } match {
-        case ( _, formulas ) => TptpFile( formulas )
+        case ( _ctx, formulas ) => TptpFile( formulas )
       } )
-
   }
 
   // private def TPTP_input = rule { typedef_formula | annotated_formula | include }
@@ -233,7 +223,7 @@ class TptpParser( val input: ParserInput ) extends Parser {
   }
   private def formula_data: Rule1[CtxTo[Expr]] = rule {
     ( ( capture( "$" ~ ( "fof" | "cnf" ) ) ~ "(" ~ Ws ~ lift( formula ) ~ ")" ~ Ws ) |
-      ( capture( "$t" ~ ( "ff" | "hf" ) ) ~ "(" ~ Ws ~ tff_logic_formula ~ ")" ~ Ws ) |
+      ( capture( "$t" ~ ( "ff" | "hf" | "cf" ) ) ~ "(" ~ Ws ~ tff_logic_formula ~ ")" ~ Ws ) |
       ( capture( "$fot" ) ~ "(" ~ Ws ~ lift( term ) ~ ")" ~ Ws ) ) ~> ( ( s: String, t: CtxTo[Expr] ) => ( ctx: Ctx ) => TptpTerm( s, t( ctx ) ) )
   }
   private def general_function = rule { atomic_word ~ "(" ~ Ws ~ general_terms ~ ")" ~ Ws ~> ( ( s: String, gt: Seq[CtxTo[Expr]] ) => ( ctx: Ctx ) => ( TptpTerm( s, ctx( gt ) ) ) ) }
@@ -245,6 +235,12 @@ class TptpParser( val input: ParserInput ) extends Parser {
   // private def tff_typed_logic_formula = rule { tff_logic_formula } //add type annotation
   //
   def tff_logic_formula: Rule1[CtxTo[Formula]] = rule { tff_unitary_formula ~ ( tff_binary_nonassoc_part | tff_or_formula_part | tff_and_formula_part ).? }
+
+  def tff_non_atomic_formula: Rule1[CtxTo[Formula]] = rule {
+    ( tff_quantified_formula | tff_unary_formula | "(" ~ Ws ~ tff_logic_formula ~ ")" ~ Ws ) ~
+      ( tff_binary_nonassoc_part | tff_or_formula_part | tff_and_formula_part ).?
+  }
+
   private def tff_binary_nonassoc_part = rule { binary_connective ~ tff_unitary_formula ~> ( ( a: CtxTo[Formula], c: ( Expr, Expr ) => Formula, b: CtxTo[Formula] ) => ( ctx: Ctx ) => c( a( ctx ), b( ctx ) ) ) }
   private def tff_or_formula_part = rule { ( "|" ~ Ws ~ tff_unitary_formula ).+ ~> ( ( a: CtxTo[Formula], as: Seq[CtxTo[Formula]] ) => ( ctx: Ctx ) => Or.leftAssociative( a( ctx ) +: ctx( as ): _* ) ) }
   private def tff_and_formula_part = rule { ( "&" ~ Ws ~ tff_unitary_formula ).+ ~> ( ( a: CtxTo[Formula], as: Seq[CtxTo[Formula]] ) => ( ctx: Ctx ) => And.leftAssociative( a( ctx ) +: ctx( as ): _* ) ) }
@@ -257,46 +253,80 @@ class TptpParser( val input: ParserInput ) extends Parser {
   }
   private def tff_unary_formula = rule { "~" ~ Ws ~ tff_unitary_formula ~> ( f => ( ctx: Ctx ) => Neg( f( ctx ) ) ) }
 
-  private def tff_atomic_formula = rule { lift( defined_prop ) | tff_infix_formula | tff_defined_predicate_formula | tff_plain_atomic_formula | ( distinct_object ~> ( ( o: String ) => Ctx.mReturn( FOLAtom( o ) ) ) ) }
+  private def tff_atomic_formula = rule { lift( defined_prop ) | tff_defined_predicate_formula | tff_infix_formula | tff_plain_atomic_formula | ( distinct_object ~> ( ( o: String ) => Ctx.mReturn( FOLAtom( o ) ) ) ) }
   private def tff_defined_predicate_formula = rule {
-    tff_defined_predicate ~ "(" ~ Ws ~ tff_term ~ Comma ~ tff_term ~ Ws ~ ")" ~> ( ( p, a, b ) => ( ctx: Ctx ) => p( a( ctx ), b( ctx ) ) )
+    tff_defined_unary_predicate ~ "(" ~ Ws ~ tff_term ~ Ws ~ ")" ~> ( ( p, a ) => ( ctx: Ctx ) => p( a( ctx ) ) ) |
+      tff_defined_binary_predicate ~ "(" ~ Ws ~ tff_term ~ Comma ~ tff_term ~ Ws ~ ")" ~> ( ( p, a, b ) => ( ctx: Ctx ) => p( a( ctx ), b( ctx ) ) )
   }
 
-  private def tff_defined_predicate = rule {
-    ( "$less" ~ Ws ~> ( () => ( a: Expr, b: Expr ) => Lesser( a, b ) ) ) |
-      ( "$greatereq" ~ Ws ~> ( () => ( a: Expr, b: Expr ) => GreaterEq( a, b ) ) ) |
-      ( "$greater" ~ Ws ~> ( () => ( a: Expr, b: Expr ) => Greater( a, b ) ) ) |
-      ( "$lesseq" ~ Ws ~> ( () => ( a: Expr, b: Expr ) => LesserEq( a, b ) ) )
-
+  private def tff_defined_unary_predicate = rule {
+    ( "$is_int" ~ Ws ~ push( ( a: Expr ) => TptpAtom( "$is_int", Seq( a ) ) ) ) |
+      ( "$is_rat" ~ Ws ~ push( ( a: Expr ) => TptpAtom( "$is_rat", Seq( a ) ) ) )
   }
 
-  private def tff_plain_atomic_formula = rule { atomic_word ~ ( "(" ~ Ws ~ tff_arguments ~ ")" ~ Ws ).? ~> ( ( p: String, as: Option[Seq[Ctx => Expr]] ) => ( ctx: Ctx ) => TptpAtom( p, as.map( ctx( _ ) ).getOrElse( Seq() ), ctx ) ) }
+  private def tff_defined_binary_predicate = rule {
+    ( "$lesseq" ~ Ws ~ push( ( a: Expr, b: Expr ) => LesserEq( a, b ) ) ) |
+      ( "$less" ~ Ws ~ push( ( a: Expr, b: Expr ) => Lesser( a, b ) ) ) |
+      ( "$greatereq" ~ Ws ~ push( ( a: Expr, b: Expr ) => GreaterEq( a, b ) ) ) |
+      ( "$greater" ~ Ws ~ push( ( a: Expr, b: Expr ) => Greater( a, b ) ) )
+  }
+
+  private def tff_plain_atomic_formula = rule {
+    atomic_word ~ ( "(" ~ Ws ~ tff_arguments ~ ")" ~ Ws ).? ~> ( ( p: String, as: Option[Seq[Ctx => Expr]] ) =>
+      ( ctx: Ctx ) => TptpAtom( p, as.map( ctx( _ ) ).getOrElse( Seq() ), ctx ) )
+  }
   private def tff_infix_formula = rule { tff_term ~ ( "=" ~ Ws ~ tff_term ~> ( ( a: CtxTo[Expr], b ) => ( ctx: Ctx ) => Eq( a( ctx ): Expr, b( ctx ) ) ) | "!=" ~ Ws ~ tff_term ~> ( ( a: CtxTo[Expr], b ) => ( ctx: Ctx ) => ( a( ctx ): Expr ) !== b( ctx ) ) ) }
 
-  private def tff_term: Rule1[CtxTo[Expr]] = rule { tff_variable | ( distinct_object ~> ( d => Ctx.mReturn( FOLConst( d ) ) ) ) | ( number ~> ( n => Ctx.mReturn( FOLConst( n ) ) ) ) | tff_defined_function_term | tff_function_term }
-  private def tff_function_term: Rule1[CtxTo[Expr]] = rule { name ~ ( "(" ~ Ws ~ tff_term.+.separatedBy( Comma ) ~ ")" ~ Ws ).? ~> ( ( hd: String, as: Option[Seq[CtxTo[Expr]]] ) => ( ( ctx: Ctx ) => TptpTerm( hd, as.getOrElse( Seq() ), ctx ) ) ) }
+  private def tff_term: Rule1[CtxTo[Expr]] = rule { tff_variable | ( distinct_object ~> ( d => Ctx.mReturn( FOLConst( d ) ) ) ) | tff_number | tff_defined_function_term | tff_function_term | tff_non_atomic_formula }
+
+  private def tff_number: Rule1[CtxTo[Expr]] = rule {
+    rational ~> { ( n: String ) => Ctx.mReturn( Const( n, TRat, Nil ) ) } |
+      real ~> { ( n: String ) => Ctx.mReturn( Const( n, TReal, Nil ) ) } |
+      integer ~> { ( n: String ) => Ctx.mReturn( Const( n, TInt, Nil ) ) }
+  }
+
+  private def tff_function_term: Rule1[CtxTo[Expr]] = rule {
+    name ~ ( "(" ~ Ws ~ tff_term.+.separatedBy( Comma ) ~ ")" ~ Ws ).? ~> ( ( hd: String, as: Option[Seq[CtxTo[Expr]]] ) => ( ( ctx: Ctx ) => TptpTerm( hd, as.getOrElse( Seq() ), ctx ) ) )
+  }
   private def tff_defined_function_term: Rule1[CtxTo[Expr]] = rule {
-    ( "$uminus" ~ "(" ~ Ws ~ tff_term ~ Ws ~ ")" ~ Ws ) ~> ( ( as: CtxTo[Expr] ) => ( ( ctx: Ctx ) => {
-      val a = as( ctx )
-      // TODO: maybe num type?
-      if ( !( a.ty == TInt || a.ty == TReal || a.ty == TRat ) ) {
-        throw new IllegalArgumentException( "$uminus expects a numeric type (TInt, TReal, TRat), got " + a.ty + ", " + ( a.ty == TInt ) )
-      }
-      TptpTerm( "$uminus", Seq( a ), a.ty )
-      // a.ty in (real, rat, int)
-    } ) ) |
-      ( "$difference" ~ "(" ~ Ws ~ tff_term ~ Comma ~ tff_term ~ Ws ~ ")" ~ Ws ) ~> ( ( a: CtxTo[Expr], b: CtxTo[Expr] ) => ( ( ctx: Ctx ) => {
-        val aFromCtx = a( ctx )
-        val bFromCtx = b( ctx )
-        if ( aFromCtx.ty != bFromCtx.ty ) {
-          throw new IllegalArgumentException( "type mismatch: $difference expects two params of same type, got a: " + aFromCtx.ty + ", b: " + bFromCtx.ty )
-        }
-        val aTy = aFromCtx.ty
-        if ( !( aTy == TInt || aTy == TReal || aTy == TRat ) ) {
-          throw new IllegalArgumentException( "$difference expects numeric types (TInt, TReal, TRat), got " + aTy )
-        }
-        TptpTerm( "$difference", Seq( aFromCtx, bFromCtx ), aFromCtx.ty )
-      } ) )
+    // unary operators
+    tff_unary_arithmetic_op( "$uminus" ) |
+      tff_unary_arithmetic_op( "$floor" ) |
+      tff_unary_arithmetic_op( "$ceiling" ) |
+      tff_unary_arithmetic_op( "$truncate" ) |
+      tff_unary_arithmetic_op( "$round" ) |
+      // coercions
+      tff_unary_arithmetic_coercion( "$to_int", TInt ) |
+      tff_unary_arithmetic_coercion( "$to_real", TReal ) |
+      tff_unary_arithmetic_coercion( "$to_rat", TRat ) |
+      // binary operators
+      tff_binary_arithmetic_op( "$sum" ) |
+      tff_binary_arithmetic_op( "$product" ) |
+      tff_binary_arithmetic_op( "$difference" ) |
+      tff_binary_arithmetic_op( "$quotient" ) |
+      tff_binary_arithmetic_op( "$quotient_e" ) |
+      tff_binary_arithmetic_op( "$quotient_t" ) |
+      tff_binary_arithmetic_op( "$quotient_f" ) |
+      tff_binary_arithmetic_op( "$remainder_e" ) |
+      tff_binary_arithmetic_op( "$remainder_t" ) |
+      tff_binary_arithmetic_op( "$remainder_f" )
+  }
+
+  //TODO: remove arguments that it can be inserted as macro
+  private def tff_unary_arithmetic_op( name: String ): Rule1[CtxTo[Expr]] = rule {
+    ( f"$name" ~ "(" ~ Ws ~ tff_term ~ Ws ~ ")" ~ Ws ) ~> (
+      ( a: CtxTo[Expr] ) => ( ctx: Ctx ) => UnaryTFATerm( name, a, ctx( a ).ty, ctx ) )
+  }
+
+  //TODO: remove arguments that it can be inserted as macro
+  private def tff_unary_arithmetic_coercion( name: String, to: Ty ): Rule1[CtxTo[Expr]] = rule {
+    ( f"$name" ~ "(" ~ Ws ~ tff_term ~ Ws ~ ")" ~ Ws ) ~> (
+      ( a: CtxTo[Expr] ) => ( ctx: Ctx ) => UnaryTFATerm( name, a, to, ctx ) )
+  }
+
+  private def tff_binary_arithmetic_op( name: String ): Rule1[CtxTo[Expr]] = rule {
+    ( name ~ "(" ~ Ws ~ tff_term ~ Comma ~ tff_term ~ Ws ~ ")" ~ Ws ) ~> ( ( a: CtxTo[Expr], b: CtxTo[Expr] ) =>
+      ( ctx: Ctx ) => BinaryTFATerm( name, a, b, ctx ) )
   }
 
   private def tff_arguments: Rule1[Seq[Ctx => Expr]] = rule { tff_term.+.separatedBy( Comma ) }
@@ -324,9 +354,8 @@ class TptpParser( val input: ParserInput ) extends Parser {
 
   private def tff_product_type: Rule1[CtxTo[Ty]] = rule {
     tff_basic_type ~ Ws ~ "*" ~ Ws ~ tff_complex_type ~> (
-      ( bt: CtxTo[Ty], ct: CtxTo[Ty] ) => ( ( ctx: Ctx ) => {
-        expr.ty.TArr( bt( ctx ), ct( ctx ) )
-      } ) )
+      ( bt: CtxTo[Ty], ct: CtxTo[Ty] ) =>
+        ( ctx: Ctx ) => expr.ty.TArr( bt( ctx ), ct( ctx ) ) )
   }
 
   // private def product_type = rule { root_type ~ ""}
@@ -358,7 +387,7 @@ class TptpParser( val input: ParserInput ) extends Parser {
   private def upper_word = rule { UpperAlpha ~ alpha_numeric.* }
   private def lower_word = rule { ( LowerAlpha ++ CharPredicate( "$_" ) ) ~ alpha_numeric.* }
 
-  private def real = rule { capture( anyOf( "+-" ).? ~ decimal ~ ( '.' ~ Digit.* ).? ~ ( anyOf( "Ee" ) ~ anyOf( "+-" ).? ~ decimal ).? ) ~ Ws }
+  private def real = rule { capture( anyOf( "+-" ).? ~ decimal ~ ( '.' ~ Digit.* ) ~ ( anyOf( "Ee" ) ~ anyOf( "+-" ).? ~ decimal ).? ) ~ Ws }
   private def rational = rule { capture( anyOf( "+-" ).? ~ decimal ~ '/' ~ positive_decimal ) ~ Ws }
   private def integer = rule { capture( anyOf( "+-" ).? ~ decimal ) ~ Ws }
   private def decimal = rule { '0' | positive_decimal }
@@ -392,22 +421,26 @@ class TptpParser( val input: ParserInput ) extends Parser {
       case _       => expr.ty.TArr( in, out )
     }
   }
+
 }
 
 object TptpImporter {
   /**
    * Parse a TPTP file, but do not resolve include directives.
    */
-  private def parse( file: InputFile ): TptpFile = {
+  private def parse( file: InputFile, ctx: Ctx = Ctx.default ): ( Ctx, TptpFile ) = {
     val input = file.read
     val parser = new TptpParser( input )
     parser.TPTP_file.run() match {
       case Failure( error: ParseError ) =>
         throw new IllegalArgumentException( s"Parse error in ${file.fileName}:\n" +
           parser.formatError( error, new ErrorFormatter( showTraces = true ) ) )
-      case Failure( exception ) => throw exception
+      case Failure( exception ) =>
+        throw exception
       // TODO: rework list of types in context, maybe move to parser def
-      case Success( value )     => value( new Ctx( Map(), Map( "$real" -> TBase( "$real" ), "$int" -> TBase( "$int" ), "$rat" -> TBase( "$rat" ), "$tType" -> TBase( "$tType" ) ) ) )
+
+      case Success( value ) =>
+        ( ctx, value( ctx ) )
     }
   }
 
@@ -416,7 +449,7 @@ object TptpImporter {
    * @param file The input file to load.
    * @return The parsed file.
    */
-  def loadWithoutIncludes( file: InputFile ): TptpFile = parse( file )
+  def loadWithoutIncludes( file: InputFile ): TptpFile = parse( file )._2
 
   /**
    * Load a TPTP file and resolve includes.
@@ -425,10 +458,10 @@ object TptpImporter {
    * @return The parsed file.
    */
   def loadWithIncludes( file: InputFile, resolver: String => TptpFile ): TptpFile =
-    resolveIncludes( parse( file ), resolver )
+    resolveIncludes( parse( file )._2, resolver )
 
   def loadWithIncludes( file: InputFile, relativeTo: Path ): TptpFile =
-    loadWithIncludes( file, fileName => parse( Path( fileName, relativeTo ) ) )
+    loadWithIncludes( file, fileName => parse( Path( fileName, relativeTo ) )._2 )
 
   def loadWithIncludes( file: InputFile, relativeTo: FilePath ): TptpFile =
     loadWithIncludes( file, Path( relativeTo, pwd ) )

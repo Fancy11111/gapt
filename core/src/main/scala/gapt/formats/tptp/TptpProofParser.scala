@@ -1,27 +1,22 @@
 package gapt.formats.tptp
 
 import gapt.expr._
-import gapt.expr.formula.And
-import gapt.expr.formula.Bottom
-import gapt.expr.formula.Formula
-import gapt.expr.formula.Imp
-import gapt.expr.formula.Neg
-import gapt.expr.formula.fol.FOLAtom
-import gapt.expr.formula.fol.FOLConst
-import gapt.expr.formula.fol.FOLFormula
-import gapt.expr.formula.fol.FOLVar
+import gapt.expr.formula.{ And, Bottom, Formula, Imp, Neg }
+import gapt.expr.formula.fol.{ FOLAtom, FOLConst, FOLFormula, FOLVar }
 import gapt.expr.formula.hol.{ containsStrongQuantifier, universalClosure }
 import gapt.expr.util.freeVariables
 import gapt.formats.InputFile
 import gapt.logic.Polarity
 import gapt.logic.clauseSubsumption
-import gapt.logic.hol.CNFn
-import gapt.logic.hol.CNFp
+import gapt.logic.hol.{ CNFn, CNFp }
 import gapt.proofs.resolution.{ AvatarDefinition, AvatarGroundComp, AvatarNonGroundComp, AvatarSplit }
 import gapt.proofs.sketch._
 import gapt.proofs.{ FOLClause, HOLClause, HOLSequent, Sequent }
+import ammonite.ops.{ Path, exists }
+import gapt.utils.withTimeout
 
 import scala.collection.mutable
+import scala.concurrent.duration._
 
 /**
  * Represents a malformed input file e.g. one that contains an unknown parent step
@@ -245,4 +240,75 @@ object TptpProofParser {
     convert( emptyClauseLabel ).head
 
   }
+
+  def handleArgs( args: Array[String] ): Option[Tuple2[String, Int]] = {
+    val synopsis = f"Synopsis: load_tstp.sh [-t seconds] <tstpfile>"
+    var i = 0
+    var timeout = 0
+    var filename = ""
+    while ( i < args.length ) {
+      if ( args( i ) == "-t" ) {
+        if ( i == args.length - 1 ) {
+          println( synopsis );
+          return None
+        }
+        i += 1
+        try {
+          timeout = args( i ).toInt
+        } catch {
+          case _: Exception =>
+            println( synopsis )
+            return None
+        }
+      } else if ( args( i ).startsWith( "-t" ) ) {
+        // handle -t1
+        try {
+          timeout = args( i ).substring( 2 ).toInt
+        } catch {
+          case _: Exception =>
+            println( synopsis )
+            return None
+        }
+
+      } else {
+        filename = args( i )
+      }
+
+      i += 1
+    }
+    Some( ( filename, timeout ) )
+  }
+
+  def loadFile( filename: String ) = {
+    try {
+      val sketch = TptpProofParser.parse( filename, true )._2
+      RefutationSketchToResolution( sketch ) match {
+        case Left( error ) =>
+          println( "% SZS status NotVerified" )
+        case Right( proof ) =>
+          println( "% SZS status Verified" )
+          println( "% SZS output start Verification" )
+          println( resolutionToTptp( proof )( gapt.proofs.context.Context.default ) )
+          println( "% SZS output end Verification" )
+
+      }
+    } catch {
+      case e: Exception =>
+        println( "% SZS status NotVerified" )
+      //println(e)
+    }
+  }
+
+  def main( args: Array[String] ): Unit = {
+    handleArgs( args ) match {
+      case None => ()
+      case Some( ( filename, timeout ) ) =>
+        if ( timeout <= 0 ) {
+          loadFile( filename )
+        } else {
+          withTimeout( timeout.seconds )( loadFile( filename ) )
+        }
+    }
+  }
 }
+
