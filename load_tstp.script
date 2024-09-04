@@ -1,0 +1,66 @@
+import gapt.proofs.sketch._
+import scala.concurrent.duration._
+import formats.tptp._
+
+def handleArgs(args: Array[String]): Option[Tuple2[String, Int]] = {
+    val synopsis = f"Synopsis: load_tstp.sh [-t seconds] <tstpfile>"
+    var i = 0
+    var timeout = 0
+    var filename = ""
+    while (i < args.length) {
+      if (args(i) == "-t") {
+        if (i == args.length - 1) {
+          println("-t can not be the last parameter"+args(i)+" "+args.length)
+          println(synopsis);
+          return None
+        }
+        i += 1
+        try {
+          timeout = args(i).toInt
+        } catch {
+          case _:Exception =>
+            println(synopsis)
+            return None
+        }
+      } else {
+        filename = args(i)
+      }
+
+      i += 1
+    }
+    Some((filename, timeout))
+}
+
+def loadFile(filename : String) = {
+    try {
+      val sketch = TptpProofParser.parse( filename, true )._2
+      RefutationSketchToResolution(sketch) match {
+        case Left(error) =>
+          println("% SZS status NotVerified")
+        case Right(proof) =>
+          println("% SZS status Verified")
+          println("% SZS output start Verification")
+          println(proof);
+          println("% SZS output end Verification")
+
+      }
+    } catch {
+      case e : Exception =>
+        println("% SZS status NotVerified")
+      //println(e)
+    }
+}
+
+def main(args: Array[String]): Unit = {
+    handleArgs(args) match {
+      case None => ()
+      case Some((filename, timeout)) =>
+        if (timeout <= 0) {
+          loadFile(filename)
+        } else {
+          withTimeout(timeout.seconds)(loadFile(filename))
+        }
+    }
+}
+
+main(args)

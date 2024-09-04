@@ -10,6 +10,7 @@ import gapt.expr.ty.Ti
 import gapt.expr.ty.To
 import gapt.proofs._
 import gapt.expr.ty.Ty
+import gapt.logic.fol.arithmetic.{ TInt, TRat, TReal }
 
 package object tptp {
 
@@ -69,14 +70,60 @@ package object tptp {
       Apps( Const( sym, FunctionType( out, args.map( _.ty ) ) ), args ) // TODO: add optional ctx lookup
     def apply( sym: String, args: Expr* )( implicit dummyImplicit: DummyImplicit ): Expr =
       TptpTerm( sym, args )
-    def apply( sym: String, args: Seq[Ctx => Expr], ctx: Ctx ): Expr =
-      // TODO: correct exception
-      Apps( Const( sym, ctx.vars.get( sym ).map( v => v.ty ).getOrElse( throw new RuntimeException() ) ), ctx( args ) )
+    def apply( sym: String, args: Seq[Ctx => Expr], ctx: Ctx ): Expr = {
+      val argtypes = ctx.vars.get( sym ).map( _.ty ).getOrElse(
+        throw new RuntimeException( s"Can not find types of $sym : ${ctx.vars.get( sym )} in context!" ) )
+      Apps( Const( sym, argtypes ), ctx( args ) )
+    }
+
     def unapplySeq( expr: Expr ): Option[( String, Seq[Expr] )] = expr match {
       case Apps( Const( sym, _, _ ), args ) => Some( ( sym, args ) )
       case _                                => None
     }
   }
+
+  object TFFTerm {
+    def check_numeral_type( name: String, a: Expr ) = {
+      if ( !( a.ty == TInt || a.ty == TReal || a.ty == TRat ) ) {
+        val msg = f"$name expects a numeric type (TInt, TReal, TRat), got " + a.ty + ", " + ( a.ty == TInt )
+        throw new IllegalArgumentException( msg )
+      }
+    }
+
+    def check_type_eq( name: String, a: Expr, b: Expr ) = {
+      if ( a.ty != b.ty ) {
+        val msg = s"type mismatch: $name expects two params of same type, got a: " + a.ty + ", b: " + b.ty
+        throw new IllegalArgumentException( msg )
+      }
+    }
+
+  }
+  object UnaryTFATerm {
+    def apply( name: String, carg: Ctx => Expr, to: Ty, ctx: Ctx ): Expr = {
+      val a = carg( ctx )
+      TFFTerm.check_numeral_type( name, a )
+      TptpTerm( name, Seq( a ), to )
+    }
+  }
+
+  object UnaryTFAAtom {
+    def apply( name: String, carg: Ctx => Expr, ctx: Ctx ): Expr = {
+      val a = carg( ctx )
+      TFFTerm.check_numeral_type( name, a )
+      TptpAtom( name, Seq( a ) )
+    }
+  }
+
+  object BinaryTFATerm {
+    def apply( name: String, a: Ctx => Expr, b: Ctx => Expr, ctx: Ctx ): Expr = {
+      val aFromCtx = a( ctx )
+      val bFromCtx = b( ctx )
+      TFFTerm.check_numeral_type( name, aFromCtx )
+      TFFTerm.check_type_eq( name, aFromCtx, bFromCtx )
+      TptpTerm( name, Seq( aFromCtx, bFromCtx ), aFromCtx.ty )
+    }
+  }
+
   def TptpAtom( sym: String, args: Seq[Expr] ): Atom =
     ( sym, args ) match {
       case ( "equal", Seq( a, b ) ) => Eq( a, b ) // old tptp syntax
