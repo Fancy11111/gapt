@@ -1,0 +1,5 @@
+../tff-problems/SWW799_1.p, ERROR
+
+real	1m0.027s
+user	0m0.004s
+sys	0m0.009s
