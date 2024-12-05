@@ -1,5 +1,0 @@
-../tff-problems/ITP230_1.p, ERROR
-
-real	1m0.024s
-user	0m0.012s
-sys	0m0.001s

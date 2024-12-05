@@ -1,5 +1,0 @@
-../tff-problems/SWW686_1.p, ERROR
-
-real	0m1.009s
-user	0m0.629s
-sys	0m0.091s
