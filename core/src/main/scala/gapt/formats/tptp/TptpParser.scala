@@ -237,7 +237,7 @@ class TptpParser( val input: ParserInput ) extends Parser {
   def tff_logic_formula: Rule1[CtxTo[Formula]] = rule { tff_unitary_formula ~ ( tff_binary_nonassoc_part | tff_or_formula_part | tff_and_formula_part ).? }
 
   def tff_non_atomic_formula: Rule1[CtxTo[Formula]] = rule {
-    ( tff_quantified_formula | tff_unary_formula | "(" ~ Ws ~ tff_logic_formula ~ ")" ~ Ws ) ~
+    ( tff_quantified_formula | tff_unary_formula ) ~
       ( tff_binary_nonassoc_part | tff_or_formula_part | tff_and_formula_part ).?
   }
 
