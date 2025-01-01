@@ -312,7 +312,8 @@ class TptpParser( val input: ParserInput ) extends Parser {
       tff_binary_arithmetic_op( "$quotient_f" ) |
       tff_binary_arithmetic_op( "$remainder_e" ) |
       tff_binary_arithmetic_op( "$remainder_t" ) |
-      tff_binary_arithmetic_op( "$remainder_f" )
+      tff_binary_arithmetic_op( "$remainder_f" ) |
+      tfx_conditional_ad_hoc
   }
 
   private def tfx_conditional_boolean = rule {
