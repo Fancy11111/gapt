@@ -41,9 +41,6 @@ import gapt.logic.fol.arithmetic.Greater
 import gapt.logic.fol.arithmetic.LesserEq
 
 class Ctx( val vars: Map[String, Var], val types: Map[String, Ty] ) {
-
-  def apply[A]( to: A ): A = to
-
   def apply[A]( to: ( Ctx => A ) ): A = {
     to( this )
   }
@@ -52,7 +49,7 @@ class Ctx( val vars: Map[String, Var], val types: Map[String, Ty] ) {
     to.map( _( this ) )
   }
 
-  def apply[A]( to: Option[A] ): Option[A] = {
+  def apply[A]( to: Option[( Ctx => A )] ): Option[A] = {
     to.map( this( _ ) )
   }
 
@@ -94,8 +91,7 @@ object Ctx {
   }
 
   val default = new Ctx(
-    Map( // "$if" -> Var("$if", expr.ty.TArr(To,))
-    ),
+    Map(),
     Map(
       "$real" -> TReal,
       "$int" -> TInt,
