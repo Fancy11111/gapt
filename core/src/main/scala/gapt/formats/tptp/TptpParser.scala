@@ -252,7 +252,7 @@ class TptpParser( val input: ParserInput ) extends Parser {
   }
   private def tff_unary_formula = rule { "~" ~ Ws ~ tff_unitary_formula ~> ( f => ( ctx: Ctx ) => Neg( f( ctx ) ) ) }
 
-  private def tff_atomic_formula = rule { lift( defined_prop ) | tff_defined_predicate_formula | tfx_conditional_boolean | tff_infix_formula | tff_plain_atomic_formula | ( distinct_object ~> ( ( o: String ) => Ctx.mReturn( FOLAtom( o ) ) ) ) }
+  private def tff_atomic_formula = rule { lift( defined_prop ) | tff_defined_predicate_formula | txf_conditional_boolean | tff_infix_formula | tff_plain_atomic_formula | ( distinct_object ~> ( ( o: String ) => Ctx.mReturn( FOLAtom( o ) ) ) ) }
   private def tff_defined_predicate_formula = rule {
     tff_defined_unary_predicate ~ "(" ~ Ws ~ tff_term ~ Ws ~ ")" ~> ( ( p, a ) => ( ctx: Ctx ) => p( a( ctx ) ) ) |
       tff_defined_binary_predicate ~ "(" ~ Ws ~ tff_term ~ Comma ~ tff_term ~ Ws ~ ")" ~> ( ( p, a, b ) => ( ctx: Ctx ) => p( a( ctx ), b( ctx ) ) )
@@ -309,10 +309,10 @@ class TptpParser( val input: ParserInput ) extends Parser {
       tff_binary_arithmetic_op( "$remainder_e" ) |
       tff_binary_arithmetic_op( "$remainder_t" ) |
       tff_binary_arithmetic_op( "$remainder_f" ) |
-      tfx_conditional_ad_hoc
+      txf_conditional_ad_hoc
   }
 
-  private def tfx_conditional_boolean = rule {
+  private def txf_conditional_boolean = rule {
     ( "$ite(" ~ Ws ~ tff_logic_formula ~ Ws ~ "," ~ Ws ~ tff_term ~ Ws ~ "," ~ Ws ~ tff_term ~ Ws ~ ")" ~ Ws ) ~> (
       ( bool: CtxTo[Formula], then_val: CtxTo[Expr], else_val: CtxTo[Expr] ) => ( ctx: Ctx ) => {
         val then_int = then_val( ctx )
@@ -325,7 +325,7 @@ class TptpParser( val input: ParserInput ) extends Parser {
       } )
   }
 
-  private def tfx_conditional_ad_hoc = rule {
+  private def txf_conditional_ad_hoc = rule {
     "$ite(" ~ Ws ~ tff_logic_formula ~ Ws ~ "," ~ Ws ~ tff_term ~ Ws ~ "," ~ Ws ~ tff_term ~ ")" ~> (
       ( bool: CtxTo[Formula], then_val: CtxTo[Expr], else_val: CtxTo[Expr] ) => ( ctx: Ctx ) => {
         val then_int = then_val( ctx )
