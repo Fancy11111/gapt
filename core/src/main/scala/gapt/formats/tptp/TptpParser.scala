@@ -228,35 +228,67 @@ class TptpParser( val input: ParserInput ) extends Parser {
   // ==========
   // tff
   // ==========
-  // private def tff_formula = rule { tff_typed_logic_formula }
-  // private def tff_typed_logic_formula = rule { tff_logic_formula } //add type annotation
-  //
-  def tff_logic_formula: Rule1[CtxTo[Formula]] = rule { ( ( tff_defined_infix ) | ( tff_unitary_formula ~ ( tff_binary_nonassoc_part | tff_or_formula_part | tff_and_formula_part ).? ) | ( tff_defined_infix ) ) }
+  private def tff_formula = rule { tff_logic_formula }
+  private def tff_logic_formula: Rule1[CtxTo[Formula]] = rule { tff_unitary_formula | tff_unary_formula | tff_binary_formula | tff_defined_infix}
 
-  def tff_non_atomic_formula: Rule1[CtxTo[Formula]] = rule {
-    ( tff_quantified_formula | tff_unary_formula | ( Ws ~ "(" ~ Ws ~ tff_logic_formula ~ Ws ~ ")" ~ Ws ) ) ~
-      ( tff_binary_nonassoc_part | tff_or_formula_part | tff_and_formula_part ).?
+  // deviation from grammar: we fix the unit formula in the front, and define the recursion in and/or formula with the latter portion
+  private def tff_binary_formula = rule {
+    tff_unit_formula ~ (tff_binary_nonassoc | tff_binary_assoc)
   }
 
-  private def tff_binary_nonassoc_part = rule { Ws ~ binary_connective ~ Ws ~ tff_unit_formula ~> ( ( a: CtxTo[Formula], c: ( Expr, Expr ) => Formula, b: CtxTo[Formula] ) => ( ctx: Ctx ) => c( a( ctx ), b( ctx ) ) ) }
-  private def tff_or_formula_part = rule { ( Ws ~ "|" ~ Ws ~ tff_unitary_formula ).+ ~> ( ( a: CtxTo[Formula], as: Seq[CtxTo[Formula]] ) => ( ctx: Ctx ) => Or.leftAssociative( a( ctx ) +: ctx( as ): _* ) ) }
-  private def tff_and_formula_part = rule { ( Ws ~ "&" ~ Ws ~ tff_unitary_formula ).+ ~> ( ( a: CtxTo[Formula], as: Seq[CtxTo[Formula]] ) => ( ctx: Ctx ) => And.leftAssociative( a( ctx ) +: ctx( as ): _* ) ) }
-  private def tff_unit_formula = rule { tff_unary_formula | tff_unitary_formula | tff_defined_infix }
-  private def tff_defined_infix_part = rule {
-    ( "=" ~ Ws ~ tff_term ~> ( ( a: CtxTo[Expr], b ) => ( ctx: Ctx ) => Eq( a( ctx ): Expr, b( ctx ) ) )
-      | "!=" ~ Ws ~ tff_term ~> ( ( a: CtxTo[Expr], b ) => ( ctx: Ctx ) => ( a( ctx ): Expr ) !== b( ctx ) ) )
+  private def tff_binary_nonassoc = rule {
+    Ws ~ binary_connective ~ Ws ~ tff_unit_formula ~> ( ( a: CtxTo[Formula], c: ( Expr, Expr ) => Formula, b: CtxTo[Formula] ) => ( ctx: Ctx ) => c( a( ctx ), b( ctx ) ) )
   }
-  private def tff_unitary_formula: Rule1[CtxTo[Formula]] = rule { tff_quantified_formula | tff_unary_formula | tff_atomic_formula | tff_variable ~> ( ( v ) => ( ctx: Ctx ) => Atom( v( ctx ) ) ) | "(" ~ Ws ~ tff_logic_formula ~ Ws ~ ")" ~ Ws }
 
+  private def tff_binary_assoc = rule {
+    tff_and_formula | tff_or_formula
+  }
+
+  private def tff_or_formula = rule { ( Ws ~ "|" ~ Ws ~ tff_unit_formula ).+ ~> ( ( a: CtxTo[Formula], as: Seq[CtxTo[Formula]] ) => ( ctx: Ctx ) => Or.leftAssociative( a( ctx ) +: ctx( as ): _* ) ) }
+  private def tff_and_formula = rule { ( Ws ~ "&" ~ Ws ~ tff_unit_formula ).+ ~> ( ( a: CtxTo[Formula], as: Seq[CtxTo[Formula]] ) => ( ctx: Ctx ) => And.leftAssociative( a( ctx ) +: ctx( as ): _* ) ) }
+
+  private def tff_unit_formula = rule { tff_unitary_formula | tff_unary_formula | tff_defined_infix}
+  private def tff_preunit_formula = rule { tff_unitary_formula | tff_prefix_unary}
+
+  private def tff_unitary_formula = rule {tff_quantified_formula | tff_atomic_formula | txf_unitary_formula | ("(" ~ Ws ~ tff_logic_formula ~ Ws ~ ")")}
+  private def txf_unitary_formula = rule { tff_variable }
   def tff_quantified_formula = rule {
-    fol_quantifier ~ "[" ~ Ws ~ tff_variable_list ~ "]" ~ Ws ~ ":" ~ Ws ~ tff_unit_formula ~> ( ( q: QuantifierHelper, variable_list, formula ) => ( ctx: Ctx ) => {
+    fol_quantifier ~ Ws ~ "[" ~ Ws ~ tff_variable_list ~ Ws ~ "]" ~ Ws ~ ":" ~ Ws ~ tff_unit_formula ~> ( ( q: QuantifierHelper, variable_list, formula ) => ( ctx: Ctx ) => {
       val vars = variable_list.map( _( ctx ) )
       q.Block( vars, formula( Ctx( ctx, vars ) ) )
     } )
   }
-  private def tff_unary_formula = rule { "~" ~ Ws ~ tff_unitary_formula ~> ( f => ( ctx: Ctx ) => Neg( f( ctx ) ) ) }
+  def tff_variable_list: Rule1[Seq[Ctx => Var]] = rule { ( ( tff_typed_variable | lift( variable ) ) ).+.separatedBy( Comma ) }
+  private def tff_typed_variable = rule { capture( upper_word ) ~ Ws ~ ":" ~ Ws ~ tff_atomic_type ~> ( ( name, t ) => ( ( ctx: Ctx ) => Var( name, t( ctx ) ) ) ) }
+  private def tff_variable: Rule1[( Ctx ) => Var] = rule {
+    capture( upper_word ) ~ Ws ~> ( ( n: String ) => ( ctx: Ctx ) =>
+      {
+        ctx.vars.get( n ).getOrElse( Var( n, Ti ) )
+      } )
+  }
 
-  private def tff_atomic_formula = rule { lift( defined_prop ) | tff_defined_predicate_formula | txf_conditional_boolean | tff_plain_atomic_formula | ( distinct_object ~> ( ( o: String ) => Ctx.mReturn( FOLAtom( o ) ) ) ) }
+  private def tff_boolean_variable: Rule1[( Ctx ) => Var] = rule {
+    capture( upper_word ) ~ Ws ~> ( ( n: String ) => ( ctx: Ctx ) =>
+      {
+        ctx.vars.get( n ).getOrElse( Var( n, Ti ) )
+      } )
+  }
+  
+  private def tff_unary_formula = rule { tff_prefix_unary | tff_infix_unary }
+  private def tff_prefix_unary = rule { tff_unary_connective ~ Ws ~ tff_preunit_formula }
+  private def tff_infix_unary = rule { tff_unitary_term ~ Ws ~ "!=" ~ tff_unitary_term }
+
+  private def tff_atomic_formula = rule { tff_plain_atomic | tff_defined_atomic | tff_system_atomic }
+  private def tff_plain_atomic = rule {  }
+  private def tff_plain_atomic_formula = rule {
+    atomic_word ~ ( "(" ~ Ws ~ tff_arguments ~ ")" ~ Ws ).? ~> ( ( p: String, as: Option[Seq[Ctx => Expr]] ) =>
+      ( ctx: Ctx ) => {
+        TptpAtom( p, as.map( ctx( _ ) ).getOrElse( Seq() ), ctx ) 
+      }
+      )
+  }
+  private def tff_system_atomic = rule { lift(defined_prop) | tff_defined_predicate_formula}
+
   private def tff_defined_predicate_formula = rule {
     tff_defined_unary_predicate ~ "(" ~ Ws ~ tff_term ~ Ws ~ ")" ~> ( ( p, a ) => ( ctx: Ctx ) => p( a( ctx ) ) ) |
       tff_defined_binary_predicate ~ "(" ~ Ws ~ tff_term ~ Comma ~ tff_term ~ Ws ~ ")" ~> ( ( p, a, b ) => ( ctx: Ctx ) => p( a( ctx ), b( ctx ) ) )
@@ -274,149 +306,214 @@ class TptpParser( val input: ParserInput ) extends Parser {
       ( "$greater" ~ Ws ~ push( ( a: Expr, b: Expr ) => Greater( a, b ) ) )
   }
 
-  private def tff_plain_atomic_formula = rule {
-    atomic_word ~ ( "(" ~ Ws ~ tff_arguments ~ ")" ~ Ws ).? ~> ( ( p: String, as: Option[Seq[Ctx => Expr]] ) =>
-      ( ctx: Ctx ) => TptpAtom( p, as.map( ctx( _ ) ).getOrElse( Seq() ), ctx ) )
+  private def tff_term = rule { (distinct_object ~> ( d => Ctx.mReturn( FOLConst( d ) ) ) )  | tff_number | txf_tuple | tff_logic_formula }
+  private def tff_unitary_term = rule { (distinct_object ~> ( d => Ctx.mReturn( FOLConst( d ) ) ) )  | tff_number | tff_atomic_formula | txf_tuple | tff_variable | ("(" ~ Ws ~ tff_logic_formula ~ Ws ~ ")")} 
+  private def txf_tuple = rule { "[" ~ Ws ~ tff_arguments ~ Ws ~ "]" ~> ((terms: Seq[CtxTo[Formula]]) => (ctx: Ctx) => {
+    val mapped_terms = terms.map(ctx(_))
+    // TODO: correct type?
+    TptpTerm("$tuple", mapped_terms, TBase("$tuple", mapped_terms.map(_.ty)))
   }
-  private def tff_defined_infix = rule {
-    tff_unitary_term ~ Ws ~ (
-      "=" ~ Ws ~ tff_unitary_term ~> ( ( a: CtxTo[Expr], b ) => ( ctx: Ctx ) => Eq( a( ctx ): Expr, b( ctx ) ) )
-      | "!=" ~ Ws ~ tff_unitary_term ~> ( ( a: CtxTo[Expr], b ) => ( ctx: Ctx ) => ( a( ctx ): Expr ) !== b( ctx ) ) )
-  }
+  )}
 
-  private def tff_term: Rule1[CtxTo[Expr]] = rule { ( distinct_object ~> ( d => Ctx.mReturn( FOLConst( d ) ) ) ) | tff_number | tff_defined_function_term | tff_function_term | tff_logic_formula }
-  private def tff_unitary_term: Rule1[CtxTo[Expr]] = rule { tff_atomic_formula | ( distinct_object ~> ( d => Ctx.mReturn( FOLConst( d ) ) ) ) | tff_number | tff_defined_function_term | tff_function_term | tff_variable | ( Ws ~ "(" ~ Ws ~ tff_logic_formula ~ Ws ~ ")" ~ Ws ) }
+  private def tff_arguments: Rule1[Seq[CtxTo[Formula]]] = rule {
+    tff_term.+.separatedBy(Comma)
+  }
 
   private def tff_number: Rule1[CtxTo[Expr]] = rule {
     rational ~> { ( n: String ) => Ctx.mReturn( Const( n, TRat, Nil ) ) } |
       real ~> { ( n: String ) => Ctx.mReturn( Const( n, TReal, Nil ) ) } |
       integer ~> { ( n: String ) => Ctx.mReturn( Const( n, TInt, Nil ) ) }
   }
-
-  private def tff_function_term: Rule1[CtxTo[Expr]] = rule {
-    name ~ ( "(" ~ Ws ~ tff_term.+.separatedBy( Comma ) ~ ")" ~ Ws ).? ~> ( ( hd: String, as: Option[Seq[CtxTo[Expr]]] ) => ( ( ctx: Ctx ) => TptpTerm( hd, as.getOrElse( Seq() ), ctx ) ) )
-
-  }
-  private def tff_defined_function_term: Rule1[CtxTo[Expr]] = rule {
-    // unary operators
-    tff_unary_arithmetic_op( "$uminus" ) |
-      tff_unary_arithmetic_op( "$floor" ) |
-      tff_unary_arithmetic_op( "$ceiling" ) |
-      tff_unary_arithmetic_op( "$truncate" ) |
-      tff_unary_arithmetic_op( "$round" ) |
-      // coercions
-      tff_unary_arithmetic_coercion( "$to_int", TInt ) |
-      tff_unary_arithmetic_coercion( "$to_real", TReal ) |
-      tff_unary_arithmetic_coercion( "$to_rat", TRat ) |
-      // binary operators
-      tff_binary_arithmetic_op( "$sum" ) |
-      tff_binary_arithmetic_op( "$product" ) |
-      tff_binary_arithmetic_op( "$difference" ) |
-      tff_binary_arithmetic_op( "$quotient" ) |
-      tff_binary_arithmetic_op( "$quotient_e" ) |
-      tff_binary_arithmetic_op( "$quotient_t" ) |
-      tff_binary_arithmetic_op( "$quotient_f" ) |
-      tff_binary_arithmetic_op( "$remainder_e" ) |
-      tff_binary_arithmetic_op( "$remainder_t" ) |
-      tff_binary_arithmetic_op( "$remainder_f" ) |
-      txf_conditional_ad_hoc
-  }
-
-  private def txf_conditional_boolean = rule {
-    ( "$ite(" ~ Ws ~ tff_logic_formula ~ Ws ~ "," ~ Ws ~ tff_term ~ Ws ~ "," ~ Ws ~ tff_term ~ Ws ~ ")" ~ Ws ) ~> (
-      ( bool: CtxTo[Formula], then_val: CtxTo[Expr], else_val: CtxTo[Expr] ) => ( ctx: Ctx ) => {
-        val then_int = then_val( ctx )
-        val else_int = else_val( ctx )
-        if ( then_int.ty != else_int.ty ) {
-          throw new MalformedInputFileException( "Expected then and else term of $ite to be of same type, got if: " + then_int.ty + "; then: " + else_int.ty )
-        }
-        TptpAtom( "$ite", Seq( bool( ctx ), then_int, else_int ) )
-        // return Apps( Const( "$ite", FunctionType( else_int.ty, Seq( To, then_int.ty, then_int.ty ) ) ), Seq( bool( ctx ), then_int, else_int ) ).asInstanceOf[Atom]
-      } )
-  }
-
-  private def txf_conditional_ad_hoc = rule {
-    "$ite(" ~ Ws ~ tff_logic_formula ~ Ws ~ "," ~ Ws ~ tff_term ~ Ws ~ "," ~ Ws ~ tff_term ~ ")" ~> (
-      ( bool: CtxTo[Formula], then_val: CtxTo[Expr], else_val: CtxTo[Expr] ) => ( ctx: Ctx ) => {
-        val then_int = then_val( ctx )
-        val else_int = else_val( ctx )
-        if ( then_int.ty != else_int.ty ) {
-          throw new MalformedInputFileException( "Expected then and else term of $ite to be of same type, got if: " + then_int.ty + "; then: " + else_int.ty )
-        }
-        // return Const("$ite", FunctionType(else_int.ty, Seq(To, then_int.ty, then_int.ty)))
-        // core/src/main/scala/gapt/formats/tptp/TptpParser.scala|328 col 16-81 error| type mismatch; found   : gapt.expr.Expr required: org.parboiled2.Rule1[TptpParser.this.CtxTo[gapt.expr.Expr]] (which expands to)  org.parboiled2.Rule[org.parboiled2.support.hlist.HNil,gapt.formats.tptp.Ctx => gapt.expr.Expr :: org.parboiled2.support.hlist.HNil]
-        TptpTerm( "$ite", Seq( bool( ctx ), then_int, else_int ), then_int.ty )
-        // return Apps( Const( "$ite", FunctionType( else_int.ty, Seq( To, then_int.ty, then_int.ty ) ) ), Seq( bool( ctx ), then_int, else_int ) ).asInstanceOf[Atom]
-      } )
-  }
-
-  //TODO: remove arguments that it can be inserted as macro
-  private def tff_unary_arithmetic_op( name: String ): Rule1[CtxTo[Expr]] = rule {
-    ( f"$name" ~ "(" ~ Ws ~ tff_term ~ Ws ~ ")" ~ Ws ) ~> (
-      ( a: CtxTo[Expr] ) => ( ctx: Ctx ) => UnaryTFATerm( name, a, ctx( a ).ty, ctx ) )
-  }
-
-  //TODO: remove arguments that it can be inserted as macro
-  private def tff_unary_arithmetic_coercion( name: String, to: Ty ): Rule1[CtxTo[Expr]] = rule {
-    ( f"$name" ~ "(" ~ Ws ~ tff_term ~ Ws ~ ")" ~ Ws ) ~> (
-      ( a: CtxTo[Expr] ) => ( ctx: Ctx ) => UnaryTFATerm( name, a, to, ctx ) )
-  }
-
-  private def tff_binary_arithmetic_op( name: String ): Rule1[CtxTo[Expr]] = rule {
-    ( name ~ "(" ~ Ws ~ tff_term ~ Comma ~ tff_term ~ Ws ~ ")" ~ Ws ) ~> ( ( a: CtxTo[Expr], b: CtxTo[Expr] ) =>
-      ( ctx: Ctx ) => BinaryTFATerm( name, a, b, ctx ) )
-  }
-
-  private def tff_arguments: Rule1[Seq[Ctx => Expr]] = rule { tff_term.+.separatedBy( Comma ) }
-
-  private def tff_general_function = rule { atomic_word ~ "(" ~ Ws ~ general_terms ~ ")" ~ Ws ~> ( ( n: String, gt: Seq[CtxTo[Expr]] ) => ( ctx: Ctx ) => TptpTerm( n, gt.map( _( ctx ) ) ) ) }
-
-  def tff_variable_list: Rule1[Seq[Ctx => Var]] = rule { ( ( tff_typed_variable | lift( variable ) ) ).+.separatedBy( Comma ) }
-  private def tff_typed_variable = rule { capture( upper_word ) ~ Ws ~ ":" ~ Ws ~ tff_atomic_type ~> ( ( name, t ) => ( ( ctx: Ctx ) => Var( name, t( ctx ) ) ) ) }
-  private def tff_variable: Rule1[( Ctx ) => Var] = rule {
-    capture( upper_word ) ~ Ws ~> ( ( n: String ) => ( ctx: Ctx ) =>
-      {
-        // TODO: are all variables necessarily quantified
-        ctx.vars.get( n ).getOrElse( Var( n, Ti ) )
-      } )
-  }
-
-  private def tff_atom_typing: Rule2[String, CtxTo[Ty]] = rule { ( atomic_word ~ Ws ~ ":" ~ Ws ~ tff_top_level_type ) | ( "(" ~ Ws ~ tff_atom_typing ~ Ws ~ ")" ) }
-  private def tff_top_level_type = rule { tff_non_atomic_type | tff_atomic_type }
-
-  private def tff_non_atomic_type: Rule1[CtxTo[Ty]] = rule { tff_mapping_type | ( "(" ~ tff_non_atomic_type ~ ")" ) }
-
-  private def tff_unitary_type = rule { tff_atomic_type | ( "(" ~ Ws ~ tff_xprod_type ~ Ws ~ ")" ) }
-  private def tff_atomic_type: Rule1[CtxTo[Ty]] = rule { tff_defined_type | ( "(" ~ Ws ~ tff_atomic_type ~ Ws ~ ")" ) }
-
-  // TODO: according to TPTP Syntax BNF, mapping types cannot appear in quantified formula variable list anymore
-  private def tff_mapping_type: Rule1[CtxTo[Ty]] = rule {
-    tff_unitary_type ~ Ws ~ ">" ~ Ws ~ tff_atomic_type ~>
-      ( ( t: CtxTo[Ty], t2: CtxTo[Ty] ) =>
-        ( ctx: Ctx ) => {
-          fixCurrying( ctx( t ), t2( ctx ) )
-        } )
-  }
-
-  private def tff_xprod_type: Rule1[CtxTo[Ty]] = rule {
-    tff_unitary_type ~ ( Ws ~ "*" ~ Ws ~ tff_atomic_type ).+ ~> (
-      ( bt: CtxTo[Ty], ct: Seq[CtxTo[Ty]] ) =>
-        // ( ctx: Ctx ) => expr.ty.TArr( bt( ctx ), ct( ctx ) ) )
-        ( ctx: Ctx ) => ct.map( _( ctx ) ).foldLeft( bt( ctx ) )( ( prod, el ) => expr.ty.TArr( prod, el ) ) )
-  }
-
-  // private def product_type = rule { root_type ~ ""}
-  private def tff_defined_type: Rule1[CtxTo[Ty]] = rule {
-    atomic_word ~> ( ( name: String ) => ( ( ctx: Ctx ) =>
-      name match {
-        case "$o"    => To
-        case "$i"    => Ti
-        case "$real" => TReal
-        case "$rat"  => TRat
-        case "$int"  => TInt
-        case name    => ctx.types.get( name ).getOrElse( throw new MalformedInputFileException( "Type (" + name + ") not defined in context; Known types: " + ctx.types ) )
-      } ) )
-  }
+  // private def tff_atomic_formula = rule { lift( defined_prop ) | tff_defined_predicate_formula | txf_conditional_boolean | tff_plain_atomic_formula | ( distinct_object ~> ( ( o: String ) => Ctx.mReturn( FOLAtom( o ) ) ) ) }
+  // private def tff_formula = rule { tff_typed_logic_formula }
+  // private def tff_typed_logic_formula = rule { tff_logic_formula } //add type annotation
+  //
+  // def tff_logic_formula: Rule1[CtxTo[Formula]] = rule { ( ( tff_defined_infix ) | ( tff_unitary_formula ~ ( tff_binary_nonassoc_part | tff_or_formula_part | tff_and_formula_part ).? ) | ( tff_defined_infix ) ) }
+  //
+  // def tff_non_atomic_formula: Rule1[CtxTo[Formula]] = rule {
+  //   ( tff_quantified_formula | tff_unary_formula | ( Ws ~ "(" ~ Ws ~ tff_logic_formula ~ Ws ~ ")" ~ Ws ) ) ~
+  //     ( tff_binary_nonassoc_part | tff_or_formula_part | tff_and_formula_part ).?
+  // }
+  //
+  // private def tff_binary_nonassoc_part = rule { Ws ~ binary_connective ~ Ws ~ tff_unit_formula ~> ( ( a: CtxTo[Formula], c: ( Expr, Expr ) => Formula, b: CtxTo[Formula] ) => ( ctx: Ctx ) => c( a( ctx ), b( ctx ) ) ) }
+  // private def tff_or_formula_part = rule { ( Ws ~ "|" ~ Ws ~ tff_unitary_formula ).+ ~> ( ( a: CtxTo[Formula], as: Seq[CtxTo[Formula]] ) => ( ctx: Ctx ) => Or.leftAssociative( a( ctx ) +: ctx( as ): _* ) ) }
+  // private def tff_and_formula_part = rule { ( Ws ~ "&" ~ Ws ~ tff_unitary_formula ).+ ~> ( ( a: CtxTo[Formula], as: Seq[CtxTo[Formula]] ) => ( ctx: Ctx ) => And.leftAssociative( a( ctx ) +: ctx( as ): _* ) ) }
+  // private def tff_unit_formula = rule { tff_unary_formula | tff_unitary_formula | tff_defined_infix }
+  // private def tff_defined_infix_part = rule {
+  //   ( "=" ~ Ws ~ tff_term ~> ( ( a: CtxTo[Expr], b ) => ( ctx: Ctx ) => Eq( a( ctx ): Expr, b( ctx ) ) )
+  //     | "!=" ~ Ws ~ tff_term ~> ( ( a: CtxTo[Expr], b ) => ( ctx: Ctx ) => ( a( ctx ): Expr ) !== b( ctx ) ) )
+  // }
+  // private def tff_unitary_formula: Rule1[CtxTo[Formula]] = rule { tff_quantified_formula | tff_unary_formula | tff_atomic_formula | tff_variable ~> ( ( v ) => ( ctx: Ctx ) => Atom( v( ctx ) ) ) | "(" ~ Ws ~ tff_logic_formula ~ Ws ~ ")" ~ Ws }
+  //
+  // def tff_quantified_formula = rule {
+  //   fol_quantifier ~ "[" ~ Ws ~ tff_variable_list ~ "]" ~ Ws ~ ":" ~ Ws ~ tff_unit_formula ~> ( ( q: QuantifierHelper, variable_list, formula ) => ( ctx: Ctx ) => {
+  //     val vars = variable_list.map( _( ctx ) )
+  //     q.Block( vars, formula( Ctx( ctx, vars ) ) )
+  //   } )
+  // }
+  // private def tff_unary_formula = rule { "~" ~ Ws ~ tff_unitary_formula ~> ( f => ( ctx: Ctx ) => Neg( f( ctx ) ) ) }
+  //
+  // private def tff_atomic_formula = rule { lift( defined_prop ) | tff_defined_predicate_formula | txf_conditional_boolean | tff_plain_atomic_formula | ( distinct_object ~> ( ( o: String ) => Ctx.mReturn( FOLAtom( o ) ) ) ) }
+  // private def tff_defined_predicate_formula = rule {
+  //   tff_defined_unary_predicate ~ "(" ~ Ws ~ tff_term ~ Ws ~ ")" ~> ( ( p, a ) => ( ctx: Ctx ) => p( a( ctx ) ) ) |
+  //     tff_defined_binary_predicate ~ "(" ~ Ws ~ tff_term ~ Comma ~ tff_term ~ Ws ~ ")" ~> ( ( p, a, b ) => ( ctx: Ctx ) => p( a( ctx ), b( ctx ) ) )
+  // }
+  //
+  // private def tff_defined_unary_predicate = rule {
+  //   ( "$is_int" ~ Ws ~ push( ( a: Expr ) => TptpAtom( "$is_int", Seq( a ) ) ) ) |
+  //     ( "$is_rat" ~ Ws ~ push( ( a: Expr ) => TptpAtom( "$is_rat", Seq( a ) ) ) )
+  // }
+  //
+  // private def tff_defined_binary_predicate = rule {
+  //   ( "$lesseq" ~ Ws ~ push( ( a: Expr, b: Expr ) => LesserEq( a, b ) ) ) |
+  //     ( "$less" ~ Ws ~ push( ( a: Expr, b: Expr ) => Lesser( a, b ) ) ) |
+  //     ( "$greatereq" ~ Ws ~ push( ( a: Expr, b: Expr ) => GreaterEq( a, b ) ) ) |
+  //     ( "$greater" ~ Ws ~ push( ( a: Expr, b: Expr ) => Greater( a, b ) ) )
+  // }
+  //
+  // private def tff_plain_atomic_formula = rule {
+  //   atomic_word ~ ( "(" ~ Ws ~ tff_arguments ~ ")" ~ Ws ).? ~> ( ( p: String, as: Option[Seq[Ctx => Expr]] ) =>
+  //     ( ctx: Ctx ) => TptpAtom( p, as.map( ctx( _ ) ).getOrElse( Seq() ), ctx ) )
+  // }
+  // private def tff_defined_infix = rule {
+  //   tff_unitary_term ~ Ws ~ (
+  //     "=" ~ Ws ~ tff_unitary_term ~> ( ( a: CtxTo[Expr], b ) => ( ctx: Ctx ) => Eq( a( ctx ): Expr, b( ctx ) ) )
+  //     | "!=" ~ Ws ~ tff_unitary_term ~> ( ( a: CtxTo[Expr], b ) => ( ctx: Ctx ) => ( a( ctx ): Expr ) !== b( ctx ) ) )
+  // }
+  //
+  // private def tff_term: Rule1[CtxTo[Expr]] = rule { ( distinct_object ~> ( d => Ctx.mReturn( FOLConst( d ) ) ) ) | tff_number | tff_defined_function_term | tff_function_term | tff_logic_formula }
+  // private def tff_unitary_term: Rule1[CtxTo[Expr]] = rule { tff_atomic_formula | ( distinct_object ~> ( d => Ctx.mReturn( FOLConst( d ) ) ) ) | tff_number | tff_defined_function_term | tff_function_term | tff_variable | ( Ws ~ "(" ~ Ws ~ tff_logic_formula ~ Ws ~ ")" ~ Ws ) }
+  //
+  // private def tff_number: Rule1[CtxTo[Expr]] = rule {
+  //   rational ~> { ( n: String ) => Ctx.mReturn( Const( n, TRat, Nil ) ) } |
+  //     real ~> { ( n: String ) => Ctx.mReturn( Const( n, TReal, Nil ) ) } |
+  //     integer ~> { ( n: String ) => Ctx.mReturn( Const( n, TInt, Nil ) ) }
+  // }
+  //
+  // private def tff_function_term: Rule1[CtxTo[Expr]] = rule {
+  //   name ~ ( "(" ~ Ws ~ tff_term.+.separatedBy( Comma ) ~ ")" ~ Ws ).? ~> ( ( hd: String, as: Option[Seq[CtxTo[Expr]]] ) => ( ( ctx: Ctx ) => TptpTerm( hd, as.getOrElse( Seq() ), ctx ) ) )
+  //
+  // }
+  // private def tff_defined_function_term: Rule1[CtxTo[Expr]] = rule {
+  //   // unary operators
+  //   tff_unary_arithmetic_op( "$uminus" ) |
+  //     tff_unary_arithmetic_op( "$floor" ) |
+  //     tff_unary_arithmetic_op( "$ceiling" ) |
+  //     tff_unary_arithmetic_op( "$truncate" ) |
+  //     tff_unary_arithmetic_op( "$round" ) |
+  //     // coercions
+  //     tff_unary_arithmetic_coercion( "$to_int", TInt ) |
+  //     tff_unary_arithmetic_coercion( "$to_real", TReal ) |
+  //     tff_unary_arithmetic_coercion( "$to_rat", TRat ) |
+  //     // binary operators
+  //     tff_binary_arithmetic_op( "$sum" ) |
+  //     tff_binary_arithmetic_op( "$product" ) |
+  //     tff_binary_arithmetic_op( "$difference" ) |
+  //     tff_binary_arithmetic_op( "$quotient" ) |
+  //     tff_binary_arithmetic_op( "$quotient_e" ) |
+  //     tff_binary_arithmetic_op( "$quotient_t" ) |
+  //     tff_binary_arithmetic_op( "$quotient_f" ) |
+  //     tff_binary_arithmetic_op( "$remainder_e" ) |
+  //     tff_binary_arithmetic_op( "$remainder_t" ) |
+  //     tff_binary_arithmetic_op( "$remainder_f" ) |
+  //     txf_conditional_ad_hoc
+  // }
+  //
+  // private def txf_conditional_boolean = rule {
+  //   ( "$ite(" ~ Ws ~ tff_logic_formula ~ Ws ~ "," ~ Ws ~ tff_term ~ Ws ~ "," ~ Ws ~ tff_term ~ Ws ~ ")" ~ Ws ) ~> (
+  //     ( bool: CtxTo[Formula], then_val: CtxTo[Expr], else_val: CtxTo[Expr] ) => ( ctx: Ctx ) => {
+  //       val then_int = then_val( ctx )
+  //       val else_int = else_val( ctx )
+  //       if ( then_int.ty != else_int.ty ) {
+  //         throw new MalformedInputFileException( "Expected then and else term of $ite to be of same type, got if: " + then_int.ty + "; then: " + else_int.ty )
+  //       }
+  //       TptpAtom( "$ite", Seq( bool( ctx ), then_int, else_int ) )
+  //       // return Apps( Const( "$ite", FunctionType( else_int.ty, Seq( To, then_int.ty, then_int.ty ) ) ), Seq( bool( ctx ), then_int, else_int ) ).asInstanceOf[Atom]
+  //     } )
+  // }
+  //
+  // private def txf_conditional_ad_hoc = rule {
+  //   "$ite(" ~ Ws ~ tff_logic_formula ~ Ws ~ "," ~ Ws ~ tff_term ~ Ws ~ "," ~ Ws ~ tff_term ~ ")" ~> (
+  //     ( bool: CtxTo[Formula], then_val: CtxTo[Expr], else_val: CtxTo[Expr] ) => ( ctx: Ctx ) => {
+  //       val then_int = then_val( ctx )
+  //       val else_int = else_val( ctx )
+  //       if ( then_int.ty != else_int.ty ) {
+  //         throw new MalformedInputFileException( "Expected then and else term of $ite to be of same type, got if: " + then_int.ty + "; then: " + else_int.ty )
+  //       }
+  //       // return Const("$ite", FunctionType(else_int.ty, Seq(To, then_int.ty, then_int.ty)))
+  //       // core/src/main/scala/gapt/formats/tptp/TptpParser.scala|328 col 16-81 error| type mismatch; found   : gapt.expr.Expr required: org.parboiled2.Rule1[TptpParser.this.CtxTo[gapt.expr.Expr]] (which expands to)  org.parboiled2.Rule[org.parboiled2.support.hlist.HNil,gapt.formats.tptp.Ctx => gapt.expr.Expr :: org.parboiled2.support.hlist.HNil]
+  //       TptpTerm( "$ite", Seq( bool( ctx ), then_int, else_int ), then_int.ty )
+  //       // return Apps( Const( "$ite", FunctionType( else_int.ty, Seq( To, then_int.ty, then_int.ty ) ) ), Seq( bool( ctx ), then_int, else_int ) ).asInstanceOf[Atom]
+  //     } )
+  // }
+  //
+  // //TODO: remove arguments that it can be inserted as macro
+  // private def tff_unary_arithmetic_op( name: String ): Rule1[CtxTo[Expr]] = rule {
+  //   ( f"$name" ~ "(" ~ Ws ~ tff_term ~ Ws ~ ")" ~ Ws ) ~> (
+  //     ( a: CtxTo[Expr] ) => ( ctx: Ctx ) => UnaryTFATerm( name, a, ctx( a ).ty, ctx ) )
+  // }
+  //
+  // //TODO: remove arguments that it can be inserted as macro
+  // private def tff_unary_arithmetic_coercion( name: String, to: Ty ): Rule1[CtxTo[Expr]] = rule {
+  //   ( f"$name" ~ "(" ~ Ws ~ tff_term ~ Ws ~ ")" ~ Ws ) ~> (
+  //     ( a: CtxTo[Expr] ) => ( ctx: Ctx ) => UnaryTFATerm( name, a, to, ctx ) )
+  // }
+  //
+  // private def tff_binary_arithmetic_op( name: String ): Rule1[CtxTo[Expr]] = rule {
+  //   ( name ~ "(" ~ Ws ~ tff_term ~ Comma ~ tff_term ~ Ws ~ ")" ~ Ws ) ~> ( ( a: CtxTo[Expr], b: CtxTo[Expr] ) =>
+  //     ( ctx: Ctx ) => BinaryTFATerm( name, a, b, ctx ) )
+  // }
+  //
+  // private def tff_arguments: Rule1[Seq[Ctx => Expr]] = rule { tff_term.+.separatedBy( Comma ) }
+  //
+  // private def tff_general_function = rule { atomic_word ~ "(" ~ Ws ~ general_terms ~ ")" ~ Ws ~> ( ( n: String, gt: Seq[CtxTo[Expr]] ) => ( ctx: Ctx ) => TptpTerm( n, gt.map( _( ctx ) ) ) ) }
+  //
+  // def tff_variable_list: Rule1[Seq[Ctx => Var]] = rule { ( ( tff_typed_variable | lift( variable ) ) ).+.separatedBy( Comma ) }
+  // private def tff_typed_variable = rule { capture( upper_word ) ~ Ws ~ ":" ~ Ws ~ tff_atomic_type ~> ( ( name, t ) => ( ( ctx: Ctx ) => Var( name, t( ctx ) ) ) ) }
+  // private def tff_variable: Rule1[( Ctx ) => Var] = rule {
+  //   capture( upper_word ) ~ Ws ~> ( ( n: String ) => ( ctx: Ctx ) =>
+  //     {
+  //       // TODO: are all variables necessarily quantified
+  //       ctx.vars.get( n ).getOrElse( Var( n, Ti ) )
+  //     } )
+  // }
+  //
+  // private def tff_atom_typing: Rule2[String, CtxTo[Ty]] = rule { ( atomic_word ~ Ws ~ ":" ~ Ws ~ tff_top_level_type ) | ( "(" ~ Ws ~ tff_atom_typing ~ Ws ~ ")" ) }
+  // private def tff_top_level_type = rule { tff_non_atomic_type | tff_atomic_type }
+  //
+  // private def tff_non_atomic_type: Rule1[CtxTo[Ty]] = rule { tff_mapping_type | ( "(" ~ tff_non_atomic_type ~ ")" ) }
+  //
+  // private def tff_unitary_type = rule { tff_atomic_type | ( "(" ~ Ws ~ tff_xprod_type ~ Ws ~ ")" ) }
+  // private def tff_atomic_type: Rule1[CtxTo[Ty]] = rule { tff_defined_type | ( "(" ~ Ws ~ tff_atomic_type ~ Ws ~ ")" ) }
+  //
+  // // TODO: according to TPTP Syntax BNF, mapping types cannot appear in quantified formula variable list anymore
+  // private def tff_mapping_type: Rule1[CtxTo[Ty]] = rule {
+  //   tff_unitary_type ~ Ws ~ ">" ~ Ws ~ tff_atomic_type ~>
+  //     ( ( t: CtxTo[Ty], t2: CtxTo[Ty] ) =>
+  //       ( ctx: Ctx ) => {
+  //         fixCurrying( ctx( t ), t2( ctx ) )
+  //       } )
+  // }
+  //
+  // private def tff_xprod_type: Rule1[CtxTo[Ty]] = rule {
+  //   tff_unitary_type ~ ( Ws ~ "*" ~ Ws ~ tff_atomic_type ).+ ~> (
+  //     ( bt: CtxTo[Ty], ct: Seq[CtxTo[Ty]] ) =>
+  //       // ( ctx: Ctx ) => expr.ty.TArr( bt( ctx ), ct( ctx ) ) )
+  //       ( ctx: Ctx ) => ct.map( _( ctx ) ).foldLeft( bt( ctx ) )( ( prod, el ) => expr.ty.TArr( prod, el ) ) )
+  // }
+  //
+  // // private def product_type = rule { root_type ~ ""}
+  // private def tff_defined_type: Rule1[CtxTo[Ty]] = rule {
+  //   atomic_word ~> ( ( name: String ) => ( ( ctx: Ctx ) =>
+  //     name match {
+  //       case "$o"    => To
+  //       case "$i"    => Ti
+  //       case "$real" => TReal
+  //       case "$rat"  => TRat
+  //       case "$int"  => TInt
+  //       case name    => ctx.types.get( name ).getOrElse( throw new MalformedInputFileException( "Type (" + name + ") not defined in context; Known types: " + ctx.types ) )
+  //     } ) )
+  // }
 
   private def name: Rule1[String] = rule { atomic_word | integer }
   // We include defined words as atomic_word, since no prover can keep them apart...
