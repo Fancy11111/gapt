@@ -3,18 +3,21 @@
 basedir="$(dirname "$0")"
 . "$basedir/include.sh"
 
-files_dir=$1
+files_dir="$(readlink -f $1)"
 
 results_dir="results"
 
 processes=4
 
-if [ $# -ge 2]; then
-	processes=$2
+if [ $# -ge 2 ]; then
+	results_dir="$(readlink -f $2)"
 fi
 
-if [ $# -ge 3]; then
+if [ $# -ge 3 ]; then
 	processes=$3
 fi
 
-rg -F "tff" --files-with-matches $files_dir | xargs -P $processes -I {} sh -c 'time ("$basedir/check_tptp.sh" % > "results/$(basename %)") 2>> "$results_dir/$(basename %)"'
+rg -F "tff" --files-with-matches $files_dir | xargs -P $processes -I {} sh -c 'time ("'"$basedir"'/bench_tptp.sh" {} > "'"$results_dir"'/$(basename {})") 2>> "'"$results_dir"'/$(basename {})"'
+# export results_dir
+# rg -F "tff" --files-with-matches $files_dir | xargs -P $processes -I {} sh -c 'echo "'$results_dir'/$(basename {})"'
+
