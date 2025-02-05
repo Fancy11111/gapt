@@ -24,11 +24,11 @@ class TptpTffParserTest extends Specification {
       TptpFile( Seq( IncludeDirective( fileName, None ) ) ),
       fileName => TptpImporter.loadWithoutIncludes( ClasspathInputFile( fileName ) ) )
 
-  "A: $i > $o,B:$i,C:$i*$o" in {
+  "B:$i,C:$i*$o" in {
 
-    val l = new TptpParser( "A: $i > $o,B:$i,C:$i*$o" ).tff_variable_list.run()
+    val l = new TptpParser( "B:$i,C:$i*$o" ).tff_variable_list.run()
     l match {
-      case Success( value )     => println( value.map( _( Ctx() ) ).foldLeft( "" )( _ + ", " + _ ) )
+      case Success( value )     => println( "variable_list: " + value.map( _( Ctx() ) ).foldLeft( "" )( _ + ", " + _ ) )
       case Failure( exception ) => failure
     }
     ok
