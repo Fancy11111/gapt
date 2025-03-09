@@ -67,13 +67,13 @@ package object tptp {
     def apply( sym: String, args: Seq[Expr] ): Expr =
       TptpTerm( sym, args, Ti )
     def apply( sym: String, args: Seq[Expr], out: Ty ): Expr =
-      Apps( Const( sym, FunctionType( out, args.map( _.ty ) ) ), args ) // TODO: add optional ctx lookup
+      Apps( Const( sym, FunctionType( out, args.map( _.ty ) ) ), args ) // TODO: add optional sig lookup
     def apply( sym: String, args: Expr* )( implicit dummyImplicit: DummyImplicit ): Expr =
       TptpTerm( sym, args )
-    def apply( sym: String, args: Seq[Ctx => Expr], ctx: Ctx ): Expr = {
-      val argtypes = ctx.vars.get( sym ).map( _.ty ).getOrElse(
-        throw new RuntimeException( s"Can not find types of $sym : ${ctx.vars.get( sym )} in context!" ) )
-      Apps( Const( sym, argtypes ), ctx( args ) )
+    def apply( sym: String, args: Seq[Sig => Expr], sig: Sig): Expr = {
+      val argtypes = sig.vars.get( sym ).map( _.ty ).getOrElse(
+        throw new RuntimeException( s"Can not find types of $sym : ${sig.vars.get( sym )} in context!" ) )
+      Apps( Const( sym, argtypes ), sig( args ) )
     }
 
     def unapplySeq( expr: Expr ): Option[( String, Seq[Expr] )] = expr match {
@@ -99,28 +99,28 @@ package object tptp {
 
   }
   object UnaryTFATerm {
-    def apply( name: String, carg: Ctx => Expr, to: Ty, ctx: Ctx ): Expr = {
-      val a = carg( ctx )
+    def apply( name: String, carg: Sig => Expr, to: Ty, sig: Sig): Expr = {
+      val a = carg( sig )
       TFFTerm.check_numeral_type( name, a )
       TptpTerm( name, Seq( a ), to )
     }
   }
 
   object UnaryTFAAtom {
-    def apply( name: String, carg: Ctx => Expr, ctx: Ctx ): Expr = {
-      val a = carg( ctx )
+    def apply( name: String, carg: Sig => Expr, sig: Sig ): Expr = {
+      val a = carg( sig )
       TFFTerm.check_numeral_type( name, a )
       TptpAtom( name, Seq( a ) )
     }
   }
 
   object BinaryTFATerm {
-    def apply( name: String, a: Ctx => Expr, b: Ctx => Expr, ctx: Ctx ): Expr = {
-      val aFromCtx = a( ctx )
-      val bFromCtx = b( ctx )
-      TFFTerm.check_numeral_type( name, aFromCtx )
-      TFFTerm.check_type_eq( name, aFromCtx, bFromCtx )
-      TptpTerm( name, Seq( aFromCtx, bFromCtx ), aFromCtx.ty )
+    def apply( name: String, a: Sig => Expr, b: Sig => Expr, sig: Sig ): Expr = {
+      val aFromsig = a( sig )
+      val bFromsig = b( sig )
+      TFFTerm.check_numeral_type( name, aFromsig )
+      TFFTerm.check_type_eq( name, aFromsig, bFromsig )
+      TptpTerm( name, Seq( aFromsig, bFromsig ), aFromsig.ty )
     }
   }
 
@@ -130,10 +130,10 @@ package object tptp {
       case _                        => Apps( Const( sym, FunctionType( To, args.map( _.ty ) ) ), args ).asInstanceOf[Atom]
     }
 
-  def TptpAtom( sym: String, args: Seq[Expr], ctx: Ctx ): Atom = {
+  def TptpAtom( sym: String, args: Seq[Expr], sig: Sig ): Atom = {
 
     ( sym, args ) match {
-      case _ => Apps( Const( sym, ctx.vars.get( sym ).getOrElse( throw new RuntimeException( "var with name " + sym + " not found" ) ).ty ), args ).asInstanceOf[Atom]
+      case _ => Apps( Const( sym, sig.vars.get( sym ).getOrElse( throw new RuntimeException( "var with name " + sym + " not found" ) ).ty ), args ).asInstanceOf[Atom]
     }
   }
 
