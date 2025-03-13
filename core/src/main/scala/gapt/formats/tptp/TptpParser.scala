@@ -58,6 +58,9 @@ class Sig( val vars: Map[String, Var], val types: Map[String, Ty] ) {
   }
 }
 
+class TptpNotYetImplementedException( val explanation: String )
+  extends Exception( s"Feature of TPTP is not yet implemented: $explanation" )
+
 object Sig {
 
   def mReturn[A]( value: A ): ( Sig => A ) = {
@@ -155,7 +158,7 @@ class TptpParser( val input: ParserInput ) extends Parser {
   }
 
   private def atom_def_formula: Rule1[SigTo[ConstDef]] = rule {
-    atomic_word ~ "(" ~ Ws ~ name ~ Comma ~ Ws ~ "type" ~ Ws ~ Comma ~ Ws ~ atomic_word ~ Ws ~ ":" ~ Ws ~ tff_complex_type ~ annotations ~ ")." ~ Ws ~>
+    atomic_word ~ "(" ~ Ws ~ name ~ Comma ~ Ws ~ "type" ~ Ws ~ Comma ~ Ws ~ atomic_word ~ Ws ~ ":" ~ Ws ~ tff_top_level_type ~ annotations ~ ")." ~ Ws ~>
       ( ( lang: String, name: String, varName: String, ty: SigTo[Ty], ann: Seq[SigTo[GeneralTerm]] ) => ( sig: Sig ) => ( ConstDef( lang, name, varName, Var( varName, ty( sig ) ), ann.map( _( sig ) ) ) ) )
   }
 
@@ -169,7 +172,7 @@ class TptpParser( val input: ParserInput ) extends Parser {
   private def annotations = rule { ( Comma ~ general_term ).* }
 
   // TODO: implement (Either (tff_atom_typing, tff_subtype )
-  private def typedef: Rule1[Formula] = rule { ( Ws ~ lower_word ~ ":" ~ Ws ~ complex_type ) ~> ( ( a: Ty ) => Top() ) }
+  // private def typedef: Rule1[Formula] = rule { ( Ws ~ lower_word ~ ":" ~ Ws ~ complex_type ) ~> ( ( a: Ty ) => Top() ) }
   // private def typedef: Rule1[Formula] = rule { (variable ~  ":" ~ Ws ~ name)  ~> ((b:String, a: FOLVar) => FOLAtom(a.name, a) ) }
 
   private def formula = rule { typed_logic_formula }
@@ -230,6 +233,61 @@ class TptpParser( val input: ParserInput ) extends Parser {
   // ==========
   // tff
   // ==========
+  //
+  private def tff_logic_formula: Rule1[SigTo[Formula]] = rule { tff_unit_formula }
+
+  private def tff_unit_formula: Rule1[SigTo[Formula]] = rule { "(" ~ Ws ~ tff_logic_formula ~ Ws ~ ")" | tff_quantified_formula }
+
+  private def tff_quantified_formula = rule { fol_quantifier ~ Ws ~ "[" ~ tff_variable_list ~ "]" ~ Ws ~ ":" ~ Ws ~ tff_logic_formula ~> ( ( q: QuantifierHelper, vs, m ) => ( sig: Sig ) => q.Block( vs( sig ), m( sig ) ) ) }
+
+  private def tff_variable_list = rule { tff_variable.+.separatedBy( Comma ) ~> ( ( vs: Seq[SigTo[Var]] ) => ( sig: Sig ) => sig.apply( vs ) ) }
+
+  private def tff_variable: Rule1[SigTo[Var]] = rule { capture( upper_word ) ~ Ws ~ ":" ~ Ws ~ tff_atomic_type ~> ( ( sym: String, t: SigTo[Ty] ) => ( ( sig: Sig ) => Var( sym, t( sig ) ) ) ) }
+
+  private def tff_top_level_type: Rule1[SigTo[Ty]] = rule { tff_atomic_type | tff_non_atomic_type }
+
+  private def tff_non_atomic_type: Rule1[SigTo[Ty]] = rule { tff_mapping_type } // TODO:
+
+  def tff_mapping_type: Rule1[SigTo[Ty]] = rule {
+    tff_unitary_type ~ Ws ~ ">" ~ Ws ~ tff_atomic_type ~> ( ( from: SigTo[Ty], to: SigTo[Ty] ) => ( sig: Sig ) => {
+      val f = from( sig )
+      val t = to( sig )
+      if ( containsTy( f, To ) ) throw new TptpNotYetImplementedException( "Currently there is only support for TF0, so no $o parameters to functions and predicates" )
+      f ->: t
+    } )
+  }
+
+  private def tff_xprod_type: Rule1[SigTo[Ty]] = rule {
+    ( tff_unitary_type ~ ( Ws ~ "*" ~ Ws ~ tff_atomic_type ).+ ) ~> ( ( l: SigTo[Ty], r: Seq[SigTo[Ty]] ) => ( sig: Sig ) => {
+      val left = l( sig )
+      val rights = sig( r )
+
+      left ->: rights.reduceRight( _ ->: _ )
+    } )
+  }
+
+  private def tff_unitary_type: Rule1[SigTo[Ty]] = rule { ( "(" ~ Ws ~ tff_xprod_type ~ Ws ~ ")" ) | tff_atomic_type }
+
+  private def tff_atomic_type: Rule1[SigTo[Ty]] = rule { "(" ~ Ws ~ tff_atomic_type ~ Ws ~ ")" | tff_defined_type | tff_type_constant ~ &( Ws ~ "(" ~ Ws ~ tff_atomic_type.+.separatedBy( Comma ) ~ Ws ~ ")" ) ~ fail( "Currently there is no support for anything other than nullary type constructors" ) | tff_type_constant }
+
+  private def tff_defined_type = rule {
+    capture( dollar_word ) ~> ( ( name: String ) => ( ( sig: Sig ) =>
+      name match {
+        case "$o"     => To
+        case "$oType" => To
+        case "$i"     => Ti
+        case "$iType" => Ti
+        case "$real"  => TReal
+        case "$rat"   => TRat
+        case "$int"   => TInt
+        case "$tType" => throw new TptpNotYetImplementedException( "Currently there is no support for TFF1, so $tType can only appear in \"tff(user_sort_type, type, user_sort: $tType).\" style fragments" )
+        case name     => throw new MalformedInputFileException( "Expected $o, $oType, $i, $iType, $real, $int, $rat, got unexpected dollar word type \"" + name + "\"" )
+      } ) )
+
+  }
+
+  private def tff_type_constant = rule { atomic_word ~> ( ( sym: String ) => ( sig: Sig ) => sig.types.get( sym ).getOrElse( throw new MalformedInputFileException( "Type \"" + sym + "\") not defined in context; Known types: " + sig.types ) ) ) }
+
   // private def tff_formula = rule { tff_typed_logic_formula }
   // private def tff_typed_logic_formula = rule { tff_logic_formula } //add type annotation
   //
@@ -385,19 +443,19 @@ class TptpParser( val input: ParserInput ) extends Parser {
   //     ( bt: SigTo[Ty], ct: SigTo[Ty] ) =>
   //       ( sig: Sig ) => expr.ty.TArr( bt( sig ), ct( sig ) ) )
   // }
-
-  // private def product_type = rule { root_type ~ ""}
-  private def tff_basic_type: Rule1[SigTo[Ty]] = rule {
-    atomic_word ~> ( ( name: String ) => ( ( sig: Sig ) =>
-      name match {
-        case "$o"    => To
-        case "$i"    => Ti
-        case "$real" => TReal
-        case "$rat"  => TRat
-        case "$int"  => TInt
-        case name    => sig.types.get( name ).getOrElse( throw new MalformedInputFileException( "Type (" + name + ") not defined in context; Known types: " + sig.types ) )
-      } ) )
-  }
+  //
+  // // private def product_type = rule { root_type ~ ""}
+  // private def tff_basic_type: Rule1[SigTo[Ty]] = rule {
+  //   atomic_word ~> ( ( name: String ) => ( ( sig: Sig ) =>
+  //     name match {
+  //       case "$o"    => To
+  //       case "$i"    => Ti
+  //       case "$real" => TReal
+  //       case "$rat"  => TRat
+  //       case "$int"  => TInt
+  //       case name    => sig.types.get( name ).getOrElse( throw new MalformedInputFileException( "Type (" + name + ") not defined in context; Known types: " + sig.types ) )
+  //     } ) )
+  // }
 
   private def name: Rule1[String] = rule { atomic_word | integer }
   // We include defined words as atomic_word, since no prover can keep them apart...
@@ -414,6 +472,7 @@ class TptpParser( val input: ParserInput ) extends Parser {
   private val alpha_numeric = UpperAlpha ++ LowerAlpha ++ Digit ++ CharPredicate( "$_" )
   private def upper_word = rule { UpperAlpha ~ alpha_numeric.* }
   private def lower_word = rule { ( LowerAlpha ++ CharPredicate( "$_" ) ) ~ alpha_numeric.* }
+  private def dollar_word = rule { "$" ~ alpha_numeric.* }
 
   private def real = rule { capture( anyOf( "+-" ).? ~ decimal ~ ( '.' ~ Digit.* ) ~ ( anyOf( "Ee" ) ~ anyOf( "+-" ).? ~ decimal ).? ) ~ Ws }
   private def rational = rule { capture( anyOf( "+-" ).? ~ decimal ~ '/' ~ positive_decimal ) ~ Ws }
@@ -447,6 +506,13 @@ class TptpParser( val input: ParserInput ) extends Parser {
     in match {
       case i ->: o => expr.ty.TArr( i, fixCurrying( o, out ) )
       case _       => expr.ty.TArr( in, out )
+    }
+  }
+
+  private def containsTy( examined: Ty, searched: Ty ): Boolean = {
+    examined match {
+      case i ->: o => return containsTy( i, searched ) || containsTy( o, searched )
+      case _       => return examined == searched
     }
   }
 

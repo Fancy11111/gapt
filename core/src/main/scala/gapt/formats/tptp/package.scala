@@ -70,7 +70,7 @@ package object tptp {
       Apps( Const( sym, FunctionType( out, args.map( _.ty ) ) ), args ) // TODO: add optional sig lookup
     def apply( sym: String, args: Expr* )( implicit dummyImplicit: DummyImplicit ): Expr =
       TptpTerm( sym, args )
-    def apply( sym: String, args: Seq[Sig => Expr], sig: Sig): Expr = {
+    def apply( sym: String, args: Seq[Sig => Expr], sig: Sig ): Expr = {
       val argtypes = sig.vars.get( sym ).map( _.ty ).getOrElse(
         throw new RuntimeException( s"Can not find types of $sym : ${sig.vars.get( sym )} in context!" ) )
       Apps( Const( sym, argtypes ), sig( args ) )
@@ -99,7 +99,7 @@ package object tptp {
 
   }
   object UnaryTFATerm {
-    def apply( name: String, carg: Sig => Expr, to: Ty, sig: Sig): Expr = {
+    def apply( name: String, carg: Sig => Expr, to: Ty, sig: Sig ): Expr = {
       val a = carg( sig )
       TFFTerm.check_numeral_type( name, a )
       TptpTerm( name, Seq( a ), to )
