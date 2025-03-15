@@ -16,6 +16,10 @@ import gapt.expr.Var
 import org.specs2.specification.core.Fragments
 import scala.util.Try
 import gapt.expr.formula.Formula
+import gapt.expr.ty.TArr
+import gapt.expr.ty.TVar
+import gapt.expr.ty.TBase
+import gapt.expr.ty.Ty
 
 class TptpTffParserTest extends Specification {
 
@@ -84,6 +88,59 @@ class TptpTffParserTest extends Specification {
         println( "cause" )
         println( exception.getMessage() )
         ok
+      }
+    }
+    ok
+  }
+
+  "($tType * $tType * $tType) > $tType" in {
+    val parser = new TptpParser( "($tType * $tType * $tType) > $tType" )
+    val l = parser.tff_mapping_type.run()
+    l match {
+      case Success( value ) => {
+        val ty = value( Sig() )
+        ty match {
+          case TArr( in, out ) => println( s"from $in -> to $out" )
+          case _               => ()
+        }
+        println( ty )
+        ok
+      }
+      case Failure( e: ParseError ) => {
+        println( parser.formatError( e, new ErrorFormatter( showTraces = true ) ) )
+        failure
+      }
+      case Failure( exception ) => {
+        println( "cause" )
+        println( exception.getMessage() )
+        failure
+      }
+    }
+    ok
+  }
+
+  "map($i, $int)" in {
+    val parser = new TptpParser( "map($i, $int) > $o" )
+    val l = parser.tff_mapping_type.run()
+    val mapTy: Ty = TBase( "map", TVar( "1" ) :: TVar( "2" ) :: Nil )
+    l match {
+      case Success( value ) => {
+        val ty = value( Sig( Sig(), "map", mapTy ) )
+        // ty match {
+        //   case TArr( in, out ) => println( s"from $in -> to $out" )
+        //   case _               => ()
+        // }
+        println( ty )
+        ok
+      }
+      case Failure( e: ParseError ) => {
+        println( parser.formatError( e, new ErrorFormatter( showTraces = true ) ) )
+        failure
+      }
+      case Failure( exception ) => {
+        println( "cause" )
+        println( exception.getMessage() )
+        failure
       }
     }
     ok

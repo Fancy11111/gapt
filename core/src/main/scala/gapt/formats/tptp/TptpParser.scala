@@ -25,6 +25,8 @@ import gapt.expr.ty.TBase
 import gapt.expr.ty.Ti
 import gapt.expr.ty.To
 import gapt.expr.ty.Ty
+import gapt.expr.ty.TVar
+import gapt.expr.ty.TArr
 import gapt.expr.ty.->:
 
 import scala.util.{ Failure, Success }
@@ -41,6 +43,13 @@ import gapt.logic.fol.arithmetic.Greater
 import gapt.logic.fol.arithmetic.LesserEq
 
 class Sig( val vars: Map[String, Var], val types: Map[String, Ty] ) {
+  private var nextTyVar: Int = 0
+
+  def getNextTyVar: TVar = {
+    nextTyVar = nextTyVar + 1
+    TVar( "" + nextTyVar )
+  }
+
   def apply[A]( to: ( Sig => A ) ): A = {
     to( this )
   }
@@ -80,13 +89,17 @@ object Sig {
   }
 
   def apply( sig: Sig, addVars: Seq[Var] ): Sig = {
-    Sig( sig.vars ++ ( addVars map {
+    val newSig = Sig( sig.vars ++ ( addVars map {
       case Var( name, ty ) => ( name, Var( name, ty ) )
     } ).toMap, sig.types )
+    newSig.nextTyVar = sig.nextTyVar
+    newSig
   }
 
   def apply( sig: Sig, name: String, t: Ty ): Sig = {
-    Sig( sig.vars, sig.types + ( name -> t ) )
+    val newSig = Sig( sig.vars, sig.types + ( name -> t ) )
+    newSig.nextTyVar = sig.nextTyVar
+    newSig
   }
 
   def apply(): Sig = {
@@ -95,11 +108,7 @@ object Sig {
 
   val default = new Sig(
     Map(),
-    Map(
-      "$real" -> TReal,
-      "$int" -> TInt,
-      "$rat" -> TRat,
-      "$tType" -> TBase( "$tType" ) ) )
+    Map() )
 
 }
 
@@ -109,6 +118,44 @@ class TptpParser( val input: ParserInput ) extends Parser {
   import CharPredicate._
 
   type SigTo[A] = Sig => A
+
+  def partitionTypesAndVars( ty: Ty ): ( Seq[Ty], Seq[Ty] ) = {
+    ty match {
+      case TVar( name ) => ( Seq( ty ), Seq() )
+      case TArr( from, to ) => {
+        val ( vars, types ) = partitionTypesAndVars( from )
+        val ( newVars, newTypes ) = partitionTypesAndVars( to )
+        ( vars ++ newVars, types ++ newTypes )
+      }
+      case TBase( name, args ) => {
+        // TODO: is this correct?
+        ( Seq(), Seq( ty ) )
+        // if ( args.isEmpty ) {
+        //   ( Seq( ty ), Seq() )
+        // } else {
+        //   val ( vars, types ) = args.foldLeft( ( Seq[Ty](), Seq[Ty]() ) ) {
+        //     case ( ( vars, types ), ty ) => {
+        //       val ( newVars, newTypes ) = partitionTypesAndVars( ty )
+        //       ( vars ++ newVars, types ++ newTypes )
+        //     }
+        //   }
+        //   if ( vars.isEmpty ) {
+        //     ( Seq(), Seq( ty ) )
+        //   } else {
+        //     ( vars, types )
+        //   }
+        // }
+      }
+    }
+  }
+
+  def extractVars( ty: Ty ): Seq[TVar] = {
+    ty match {
+      case tVar @ TVar( name ) => Seq( tVar )
+      case TArr( from, to )    => extractVars( from ) ++ extractVars( to )
+      case TBase( name, args ) => Seq( args.map( _.asInstanceOf[TVar] ): _* )
+    }
+  }
 
   private def Ws = rule {
     quiet( zeroOrMore( anyOf( " \t \n" ) |
@@ -141,7 +188,8 @@ class TptpParser( val input: ParserInput ) extends Parser {
   }
 
   // private def TPTP_input = rule { typedef_formula | annotated_formula | include }
-  private def TPTP_input = rule { typedef_formula | atom_def_formula | tff_annotated_formula | annotated_formula | lift( include ) }
+  // private def TPTP_input = rule { typedef_formula | atom_def_formula | tff_annotated_formula | annotated_formula | lift( include ) }
+  private def TPTP_input = rule { atom_def_formula | tff_annotated_formula | annotated_formula | lift( include ) }
 
   private def annotated_formula: Rule1[SigTo[TptpInput]] = rule {
 
@@ -152,14 +200,30 @@ class TptpParser( val input: ParserInput ) extends Parser {
   //  tff(animal_type,type, animal: $tType ).
 
   //  TODO
-  def typedef_formula: Rule1[SigTo[TypeDef]] = rule {
-    atomic_word ~ "(" ~ Ws ~ name ~ Comma ~ Ws ~ "type" ~ Ws ~ Comma ~ Ws ~ atomic_word ~ Ws ~ ":" ~ Ws ~ "$tType" ~ Ws ~ annotations ~ ")." ~ Ws ~>
-      ( ( lang: String, name: String, typeName: String, ann: Seq[SigTo[GeneralTerm]] ) => ( sig: Sig ) => ( TypeDef( lang, name, typeName, TBase( typeName ), ann.map( _( sig ) ) ) ) )
-  }
+  // def typedef_formula: Rule1[SigTo[TypeDef]] = rule {
+  //   atomic_word ~ "(" ~ Ws ~ name ~ Comma ~ Ws ~ "type" ~ Ws ~ Comma ~ Ws ~ atomic_word ~ Ws ~ ":" ~ Ws ~ "$tType" ~ Ws ~ annotations ~ ")." ~ Ws ~>
+  //     ( ( lang: String, name: String, typeName: String, ann: Seq[SigTo[GeneralTerm]] ) => ( sig: Sig ) => ( TypeDef( lang, name, typeName, TBase( typeName ), ann.map( _( sig ) ) ) ) )
+  // }
 
-  private def atom_def_formula: Rule1[SigTo[ConstDef]] = rule {
+  private def atom_def_formula: Rule1[SigTo[TptpInput]] = rule {
     atomic_word ~ "(" ~ Ws ~ name ~ Comma ~ Ws ~ "type" ~ Ws ~ Comma ~ Ws ~ atomic_word ~ Ws ~ ":" ~ Ws ~ tff_top_level_type ~ annotations ~ ")." ~ Ws ~>
-      ( ( lang: String, name: String, varName: String, ty: SigTo[Ty], ann: Seq[SigTo[GeneralTerm]] ) => ( sig: Sig ) => ( ConstDef( lang, name, varName, Var( varName, ty( sig ) ), ann.map( _( sig ) ) ) ) )
+      ( ( lang: String, name: String, varName: String, ty: SigTo[Ty], ann: Seq[SigTo[GeneralTerm]] ) => ( sig: Sig ) => {
+        val ( tyVars, tyTypes ) = partitionTypesAndVars( ty( sig ) )
+        if ( tyVars.nonEmpty && tyTypes.isEmpty ) {
+          // all type vars -> type def
+          ty( sig ) match {
+            case TArr( in, out ) => TypeDef( lang, name, varName, TBase( varName, in ), ann.map( _( sig ) ) )
+            case TVar( _ )       => TypeDef( lang, name, varName, TBase( varName ), ann.map( _( sig ) ) )
+            case _               => throw new MalformedInputFileException( "Illegal mix of types and type vars" )
+          }
+        } else if ( tyVars.isEmpty && tyTypes.nonEmpty ) {
+          // all types, atom def
+          ConstDef( lang, name, varName, Var( varName, ty( sig ) ), ann.map( _( sig ) ) )
+        } else {
+          // Should not happen, as this case is already checked in the type rules
+          throw new MalformedInputFileException( "Illegal mix of types and type vars" )
+        }
+      } )
   }
 
   private def tff_annotated_formula: Rule1[SigTo[TptpInput]] = rule {
@@ -249,11 +313,36 @@ class TptpParser( val input: ParserInput ) extends Parser {
   private def tff_non_atomic_type: Rule1[SigTo[Ty]] = rule { tff_mapping_type } // TODO:
 
   def tff_mapping_type: Rule1[SigTo[Ty]] = rule {
-    tff_unitary_type ~ Ws ~ ">" ~ Ws ~ tff_atomic_type ~> ( ( from: SigTo[Ty], to: SigTo[Ty] ) => ( sig: Sig ) => {
-      val f = from( sig )
-      val t = to( sig )
-      if ( containsTy( f, To ) ) throw new TptpNotYetImplementedException( "Currently there is only support for TF0, so no $o parameters to functions and predicates" )
-      f ->: t
+    tff_unitary_type ~ Ws ~ ">" ~ Ws ~ tff_atomic_type ~> ( ( f: SigTo[Ty], t: SigTo[Ty] ) => ( sig: Sig ) => {
+      val from = f( sig )
+      val to = t( sig )
+      if ( containsTy( from, To ) ) throw new TptpNotYetImplementedException( "Currently there is only support for TF0, so no $o parameters to functions and predicates" )
+
+      val ( fromVars, fromTypes ) = partitionTypesAndVars( from )
+      if ( fromVars.nonEmpty && fromTypes.isEmpty ) {
+        to match {
+          case TVar( name ) => {
+            println( s"type constructor: $fromVars > $to" )
+            from ->: to
+          }
+          case _ => {
+            println( s"mismatched type constructor: $fromVars > $to; vars: $fromVars" )
+            throw new MalformedInputFileException( "Illegal mix of types and type vars" )
+          }
+        }
+      } else if ( fromVars.isEmpty && fromTypes.nonEmpty ) {
+        to match {
+          case TVar( name ) => {
+            throw new MalformedInputFileException( s"Illegal mix of types and type vars, from: $fromVars | $fromTypes, to: $to" )
+          }
+          case _ => {
+            println( s"function definition: $fromTypes > $to" )
+            from ->: to
+          }
+        }
+      } else {
+        throw new MalformedInputFileException( "Illegal mix of types and type vars" )
+      }
     } )
   }
 
@@ -268,7 +357,26 @@ class TptpParser( val input: ParserInput ) extends Parser {
 
   private def tff_unitary_type: Rule1[SigTo[Ty]] = rule { ( "(" ~ Ws ~ tff_xprod_type ~ Ws ~ ")" ) | tff_atomic_type }
 
-  private def tff_atomic_type: Rule1[SigTo[Ty]] = rule { "(" ~ Ws ~ tff_atomic_type ~ Ws ~ ")" | tff_defined_type | tff_type_constant ~ &( Ws ~ "(" ~ Ws ~ tff_atomic_type.+.separatedBy( Comma ) ~ Ws ~ ")" ) ~ fail( "Currently there is no support for anything other than nullary type constructors" ) | tff_type_constant }
+  private def tff_atomic_type: Rule1[SigTo[Ty]] = rule {
+    "(" ~ Ws ~ tff_atomic_type ~ Ws ~ ")" | tff_defined_type |
+      tff_type_constructor | tff_type_constant
+  }
+
+  private def tff_type_constructor = rule {
+    tff_type_constant ~ Ws ~ "(" ~ Ws ~ tff_atomic_type.+.separatedBy( Comma ) ~ Ws ~ ")" ~> ( ( tyFunc: SigTo[Ty], args: Seq[SigTo[Ty]] ) => ( sig: Sig ) => {
+      val typeFunctor = tyFunc( sig )
+      val typeVars = extractVars( typeFunctor )
+      val typeArgs = sig( args )
+      val typeVarsToActualMap = typeVars.zip( typeArgs ).toMap
+
+      println( s"substituting in $typeFunctor with $typeVarsToActualMap, from $typeVars to $typeArgs" )
+
+      val subst = new expr.subst.Substitution( Map(), typeVarsToActualMap )
+      subst( typeFunctor )
+
+      // TBase( name, args.map( _( sig ) ) )
+    } )
+  }
 
   private def tff_defined_type = rule {
     capture( dollar_word ) ~> ( ( name: String ) => ( ( sig: Sig ) =>
@@ -280,7 +388,8 @@ class TptpParser( val input: ParserInput ) extends Parser {
         case "$real"  => TReal
         case "$rat"   => TRat
         case "$int"   => TInt
-        case "$tType" => throw new TptpNotYetImplementedException( "Currently there is no support for TFF1, so $tType can only appear in \"tff(user_sort_type, type, user_sort: $tType).\" style fragments" )
+        // case "$tType" => throw new TptpNotYetImplementedException( "Currently there is no support for TFF1, so $tType can only appear in \"tff(user_sort_type, type, user_sort: $tType).\" style fragments" )
+        case "$tType" => sig.getNextTyVar
         case name     => throw new MalformedInputFileException( "Expected $o, $oType, $i, $iType, $real, $int, $rat, got unexpected dollar word type \"" + name + "\"" )
       } ) )
 
