@@ -31,17 +31,22 @@ class TptpTffParserTest extends Specification {
   "$i > $o" in {
     val l = new TptpParser( "$i > $o" ).tff_mapping_type.run()
     l match {
-      case Success( value )     => println( value( Sig() ) )
-      case Failure( exception ) => failure
+      case Success( value ) => {
+        value( Sig() )
+        success
+      }
+      case Failure( e: ParseError ) => failure
+      case Failure( exception )     => failure
     }
-    ok
   }
 
   "($i * $i) > $o" in {
     val parser = new TptpParser( "($i * $i) > $o" )
     val l = parser.tff_mapping_type.run()
     l match {
-      case Success( value ) => println( value( Sig() ) )
+      case Success( value ) => {
+        success
+      }
       case Failure( e: ParseError ) => {
         println( parser.formatError( e, new ErrorFormatter( showTraces = true ) ) )
         failure
@@ -50,47 +55,46 @@ class TptpTffParserTest extends Specification {
         println( "cause" )
         failure
       }
+      case _ => failure
     }
-    ok
   }
 
   "($i * $i * $i) > $o" in {
     val parser = new TptpParser( "($i * $i * $i) > $o" )
     val l = parser.tff_mapping_type.run()
     l match {
-      case Success( value ) => println( value( Sig() ) )
+      case Success( value ) => {
+        value( Sig() )
+        success
+      }
       case Failure( e: ParseError ) => {
-        println( parser.formatError( e, new ErrorFormatter( showTraces = true ) ) )
         failure
       }
       case Failure( exception ) => {
-        println( "cause" )
         failure
       }
     }
-    ok
   }
 
   "($tType * $i * $i) > $o" in {
     val parser = new TptpParser( "($i * $tType * $i) > $o" )
     val l = parser.tff_mapping_type.run()
     l match {
-      case Success( value ) => {
-        println( value( Sig() ) )
-        failure
-      }
+      case Success( value ) =>
+        Try( value( Sig() ) ) match {
+          case Success( ty ) => failure
+          case Failure( e )  => success
+        }
+
       case Failure( e: ParseError ) => {
-        println( parser.formatError( e, new ErrorFormatter( showTraces = true ) ) )
-        // ok
         failure
       }
       case Failure( exception ) => {
-        println( "cause" )
-        println( exception.getMessage() )
-        ok
+        failure
       }
+
+      case _ => failure
     }
-    ok
   }
 
   "($tType * $tType * $tType) > $tType" in {
@@ -100,23 +104,17 @@ class TptpTffParserTest extends Specification {
       case Success( value ) => {
         val ty = value( Sig() )
         ty match {
-          case TArr( in, out ) => println( s"from $in -> to $out" )
-          case _               => ()
+          case TArr( in, out ) => success
+          case _               => failure
         }
-        println( ty )
-        ok
       }
       case Failure( e: ParseError ) => {
-        println( parser.formatError( e, new ErrorFormatter( showTraces = true ) ) )
         failure
       }
       case Failure( exception ) => {
-        println( "cause" )
-        println( exception.getMessage() )
         failure
       }
     }
-    ok
   }
 
   "map($i, $int)" in {
@@ -126,12 +124,10 @@ class TptpTffParserTest extends Specification {
     l match {
       case Success( value ) => {
         val ty = value( Sig( Sig(), "map", mapTy ) )
-        // ty match {
-        //   case TArr( in, out ) => println( s"from $in -> to $out" )
-        //   case _               => ()
-        // }
-        println( ty )
-        ok
+        ty match {
+          case TArr( in, out ) => success
+          case _               => failure
+        }
       }
       case Failure( e: ParseError ) => {
         println( parser.formatError( e, new ErrorFormatter( showTraces = true ) ) )
@@ -143,7 +139,6 @@ class TptpTffParserTest extends Specification {
         failure
       }
     }
-    ok
   }
   // "A: $i > $o,B:$i,C:$i*$o" in {
   //
@@ -155,22 +150,24 @@ class TptpTffParserTest extends Specification {
   //   ok
   // }
   //
-  // "typedef formula" in {
-  //   val parser = new TptpParser( "tff(animal_type,type, animal: $tType )." )
-  //   val res = parser.typedef_formula.run()
-  //   res match {
-  //     case Success( value ) => println( value( new Ctx( Map(), Map() ) ) )
-  //     case Failure( e: ParseError ) => {
-  //       println( parser.formatError( e, new ErrorFormatter( showTraces = true ) ) )
-  //       failure
-  //     }
-  //     case Failure( exception ) => {
-  //       println( "cause" )
-  //       failure
-  //     }
-  //   }
-  //   ok
-  // }
+  "typedef formula" in {
+    val parser = new TptpParser( "tff(animal_type,type, animal: $tType )." )
+    val res = parser.TPTP_file.run()
+    res match {
+      case Success( value ) => {
+        value( new Sig( Map(), Map() ) )
+        success
+      }
+      case Failure( e: ParseError ) => {
+        println( parser.formatError( e, new ErrorFormatter( showTraces = true ) ) )
+        failure
+      }
+      case Failure( exception ) => {
+        println( "cause" )
+        failure
+      }
+    }
+  }
   //
   // "tff formula" >> {
   //
