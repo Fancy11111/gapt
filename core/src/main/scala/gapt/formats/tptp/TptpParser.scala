@@ -206,7 +206,7 @@ class TptpParser( val input: ParserInput ) extends Parser {
   // }
 
   private def atom_def_formula: Rule1[SigTo[TptpInput]] = rule {
-    atomic_word ~ "(" ~ Ws ~ name ~ Comma ~ Ws ~ "type" ~ Ws ~ Comma ~ Ws ~ atomic_word ~ Ws ~ ":" ~ Ws ~ tff_top_level_type ~ annotations ~ ")." ~ Ws ~>
+    atomic_word ~ "(" ~ Ws ~ name ~ Comma ~ Ws ~ "type" ~ Ws ~ Comma ~ Ws ~ atomic_word ~ Ws ~ ":" ~ Ws ~ tff_top_level_type ~ Ws ~ annotations ~ ")." ~ Ws ~>
       ( ( lang: String, name: String, varName: String, ty: SigTo[Ty], ann: Seq[SigTo[GeneralTerm]] ) => ( sig: Sig ) => {
         val ( tyVars, tyTypes ) = partitionTypesAndVars( ty( sig ) )
         if ( tyVars.nonEmpty && tyTypes.isEmpty ) {
@@ -227,7 +227,7 @@ class TptpParser( val input: ParserInput ) extends Parser {
   }
 
   private def tff_annotated_formula: Rule1[SigTo[TptpInput]] = rule {
-    "tff(" ~ Ws ~ name ~ Comma ~ ( formula_role ~ Comma ~ tff_logic_formula ) ~ annotations ~ ")." ~ Ws ~>
+    "tff(" ~ Ws ~ name ~ Comma ~ ( formula_role ~ Comma ~ tff_logic_formula ) ~ Ws ~ annotations ~ ")." ~ Ws ~>
       ( ( name: String, role: String, form: SigTo[Formula], ann: Seq[SigTo[GeneralTerm]] ) => ( sig: Sig ) => ( AnnotatedFormula( "tff", name, role, form( sig ), ann.map( _( sig ) ) ) ) )
   }
 
@@ -322,11 +322,9 @@ class TptpParser( val input: ParserInput ) extends Parser {
       if ( fromVars.nonEmpty && fromTypes.isEmpty ) {
         to match {
           case TVar( name ) => {
-            println( s"type constructor: $fromVars > $to" )
             from ->: to
           }
           case _ => {
-            println( s"mismatched type constructor: $fromVars > $to; vars: $fromVars" )
             throw new MalformedInputFileException( "Illegal mix of types and type vars" )
           }
         }
@@ -336,7 +334,7 @@ class TptpParser( val input: ParserInput ) extends Parser {
             throw new MalformedInputFileException( s"Illegal mix of types and type vars, from: $fromVars | $fromTypes, to: $to" )
           }
           case _ => {
-            println( s"function definition: $fromTypes > $to" )
+            
             from ->: to
           }
         }
@@ -368,8 +366,6 @@ class TptpParser( val input: ParserInput ) extends Parser {
       val typeVars = extractVars( typeFunctor )
       val typeArgs = sig( args )
       val typeVarsToActualMap = typeVars.zip( typeArgs ).toMap
-
-      println( s"substituting in $typeFunctor with $typeVarsToActualMap, from $typeVars to $typeArgs" )
 
       val subst = new expr.subst.Substitution( Map(), typeVarsToActualMap )
       subst( typeFunctor )
