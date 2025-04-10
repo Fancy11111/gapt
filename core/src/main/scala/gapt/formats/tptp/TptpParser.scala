@@ -175,7 +175,11 @@ class TptpParser( val input: ParserInput ) extends Parser {
           val tptp_input = contextLookup( acc_sig )
           tptp_input match {
             case TypeDef( _, _, name, ty, _ ) =>
-              ( Sig( acc_sig, name, ty ), acc_inputs :+ tptp_input )
+              if ( ty.isInstanceOf[TBase] && ty.asInstanceOf[TBase].name == "$tType" ) {
+                val newTy = TVar( name ) 
+                ( Sig( acc_sig, name, newTy ), acc_inputs :+ tptp_input )
+              }
+              else ( Sig( acc_sig, name, ty ), acc_inputs :+ tptp_input )
             case ConstDef( _, _, name, v, _ ) =>
               ( Sig( acc_sig, name, v ), acc_inputs :+ tptp_input )
             case other => // Formula or include directive
@@ -213,7 +217,9 @@ class TptpParser( val input: ParserInput ) extends Parser {
           // all type vars -> type def
           ty( sig ) match {
             case TArr( in, out ) => TypeDef( lang, name, varName, TBase( varName, in ), ann.map( _( sig ) ) )
-            case TVar( _ )       => TypeDef( lang, name, varName, TBase( varName ), ann.map( _( sig ) ) )
+            case TVar( _ )       => TypeDef( lang, name, varName, TBase( "$tType" ), ann.map( _( sig ) ) ) 
+            // TODO: cannot use TVar here, messes up toString
+            // case TVar( _ )       => TypeDef( lang, name, varName, TVar( varName ), ann.map( _( sig ) ) ) 
             case _               => throw new MalformedInputFileException( "Illegal mix of types and type vars" )
           }
         } else if ( tyVars.isEmpty && tyTypes.nonEmpty ) {
