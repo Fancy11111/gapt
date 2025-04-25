@@ -149,6 +149,35 @@ class TptpParser( val input: ParserInput ) extends Parser {
     }
   }
 
+  def createMappingType( f: SigTo[Ty], t: SigTo[Ty], sig: Sig ): Ty = {
+    val from = f( sig )
+    val to = t( sig )
+
+    val ( fromVars, fromTypes ) = partitionTypesAndVars( from )
+    if ( fromVars.nonEmpty && fromTypes.isEmpty ) {
+      to match {
+        case TVar( name ) => {
+          from ->: to
+        }
+        case _ => {
+          throw new MalformedInputFileException( "Illegal mix of types and type vars" )
+        }
+      }
+    } else if ( fromVars.isEmpty && fromTypes.nonEmpty ) {
+      to match {
+        case TVar( name ) => {
+          throw new MalformedInputFileException( s"Illegal mix of types and type vars, from: $fromVars | $fromTypes, to: $to" )
+        }
+        case _ => {
+
+          from ->: to
+        }
+      }
+    } else {
+      throw new MalformedInputFileException( "Illegal mix of types and type vars" )
+    }
+  }
+
   def extractVars( ty: Ty ): Seq[TVar] = {
     ty match {
       case tVar @ TVar( name ) => Seq( tVar )
@@ -176,12 +205,11 @@ class TptpParser( val input: ParserInput ) extends Parser {
           tptp_input match {
             case TypeDef( _, _, name, ty, _ ) =>
               if ( ty.isInstanceOf[TBase] && ty.asInstanceOf[TBase].name == "$tType" ) {
-                val newTy = TVar( name ) 
+                val newTy = TVar( name )
                 ( Sig( acc_sig, name, newTy ), acc_inputs :+ tptp_input )
-              }
-              else ( Sig( acc_sig, name, ty ), acc_inputs :+ tptp_input )
-            case ConstDef( _, _, name, v, _ ) =>
-              ( Sig( acc_sig, name, v ), acc_inputs :+ tptp_input )
+              } else ( Sig( acc_sig, name, ty ), acc_inputs :+ tptp_input )
+            case ConstDef( _, _, name, ty, _ ) =>
+              ( Sig( acc_sig, name, Var( name, ty ) ), acc_inputs :+ tptp_input )
             case other => // Formula or include directive
               ( acc_sig, acc_inputs :+ other )
           }
@@ -193,7 +221,7 @@ class TptpParser( val input: ParserInput ) extends Parser {
 
   // private def TPTP_input = rule { typedef_formula | annotated_formula | include }
   // private def TPTP_input = rule { typedef_formula | atom_def_formula | tff_annotated_formula | annotated_formula | lift( include ) }
-  private def TPTP_input = rule { atom_def_formula | tff_annotated_formula | annotated_formula | lift( include ) }
+  private def TPTP_input = rule { type_def_formula | atom_def_formula | tff_annotated_formula | annotated_formula | lift( include ) }
 
   private def annotated_formula: Rule1[SigTo[TptpInput]] = rule {
 
@@ -209,26 +237,41 @@ class TptpParser( val input: ParserInput ) extends Parser {
   //     ( ( lang: String, name: String, typeName: String, ann: Seq[SigTo[GeneralTerm]] ) => ( sig: Sig ) => ( TypeDef( lang, name, typeName, TBase( typeName ), ann.map( _( sig ) ) ) ) )
   // }
 
+  // private def atom_def_formula: Rule1[SigTo[TptpInput]] = rule {
+  //   atomic_word ~ "(" ~ Ws ~ name ~ Comma ~ Ws ~ "type" ~ Ws ~ Comma ~ Ws ~ atomic_word ~ Ws ~ ":" ~ Ws ~ tff_top_level_type ~ Ws ~ annotations ~ ")." ~ Ws ~>
+  //     ( ( lang: String, name: String, varName: String, ty: SigTo[Ty], ann: Seq[SigTo[GeneralTerm]] ) => ( sig: Sig ) => {
+  //       val ( tyVars, tyTypes ) = partitionTypesAndVars( ty( sig ) )
+  //       if ( tyVars.nonEmpty && tyTypes.isEmpty ) {
+  //         // all type vars -> type def
+  //         ty( sig ) match {
+  //           case TArr( in, out ) => TypeDef( lang, name, varName, TBase( varName, in ), ann.map( _( sig ) ) )
+  //           case TVar( _ )       => TypeDef( lang, name, varName, TBase( "$tType" ), ann.map( _( sig ) ) )
+  //           // TODO: cannot use TVar here, messes up toString
+  //           // case TVar( _ )       => TypeDef( lang, name, varName, TVar( varName ), ann.map( _( sig ) ) )
+  //           case _               => throw new MalformedInputFileException( "Illegal mix of types and type vars" )
+  //         }
+  //       } else if ( tyVars.isEmpty && tyTypes.nonEmpty ) {
+  //         // all types, atom def
+  //         ConstDef( lang, name, varName, Var( varName, ty( sig ) ), ann.map( _( sig ) ) )
+  //       } else {
+  //         // Should not happen, as this case is already checked in the type rules
+  //         throw new MalformedInputFileException( "Illegal mix of types and type vars" )
+  //       }
+  //     } )
+  // }
+  //
+  //
+  private def type_def_formula: Rule1[SigTo[TptpInput]] = rule {
+    "tff(" ~ Ws ~ name ~ "," ~ Ws ~ "type" ~ "," ~ Ws ~ name ~ ":" ~ Ws ~ "$tType" ~ Ws ~ annotations ~ ")." ~ Ws ~>
+      ( ( name: String, sortName: String, ann: Seq[SigTo[GeneralTerm]] ) => ( sig: Sig ) => {
+        TypeDef( "tff", name, sortName, TBase( sortName ), ann.map( _( sig ) ) )
+      } )
+  }
+
   private def atom_def_formula: Rule1[SigTo[TptpInput]] = rule {
-    atomic_word ~ "(" ~ Ws ~ name ~ Comma ~ Ws ~ "type" ~ Ws ~ Comma ~ Ws ~ atomic_word ~ Ws ~ ":" ~ Ws ~ tff_top_level_type ~ Ws ~ annotations ~ ")." ~ Ws ~>
-      ( ( lang: String, name: String, varName: String, ty: SigTo[Ty], ann: Seq[SigTo[GeneralTerm]] ) => ( sig: Sig ) => {
-        val ( tyVars, tyTypes ) = partitionTypesAndVars( ty( sig ) )
-        if ( tyVars.nonEmpty && tyTypes.isEmpty ) {
-          // all type vars -> type def
-          ty( sig ) match {
-            case TArr( in, out ) => TypeDef( lang, name, varName, TBase( varName, in ), ann.map( _( sig ) ) )
-            case TVar( _ )       => TypeDef( lang, name, varName, TBase( "$tType" ), ann.map( _( sig ) ) ) 
-            // TODO: cannot use TVar here, messes up toString
-            // case TVar( _ )       => TypeDef( lang, name, varName, TVar( varName ), ann.map( _( sig ) ) ) 
-            case _               => throw new MalformedInputFileException( "Illegal mix of types and type vars" )
-          }
-        } else if ( tyVars.isEmpty && tyTypes.nonEmpty ) {
-          // all types, atom def
-          ConstDef( lang, name, varName, Var( varName, ty( sig ) ), ann.map( _( sig ) ) )
-        } else {
-          // Should not happen, as this case is already checked in the type rules
-          throw new MalformedInputFileException( "Illegal mix of types and type vars" )
-        }
+    "tff(" ~ Ws ~ name ~ Comma ~ Ws ~ "type" ~ Ws ~ "," ~ Ws ~ atomic_word ~ Ws ~ ":" ~ Ws ~ tff_top_level_type ~ Ws ~ annotations ~ ")." ~ Ws ~>
+      ( ( name: String, varName: String, ty: SigTo[Ty], ann: Seq[SigTo[GeneralTerm]] ) => ( sig: Sig ) => {
+        ConstDef( "tff", name, varName, ty( sig ), ann.map( _( sig ) ) )
       } )
   }
 
@@ -290,6 +333,7 @@ class TptpParser( val input: ParserInput ) extends Parser {
       general_list ~> ( ( l: Seq[SigTo[Expr]] ) => ( ( sig: Sig ) => GeneralList( sig( l ) ) ) )
   }
   private def general_data: Rule1[SigTo[Expr]] = rule {
+
     formula_data | general_function | atomic_word ~> ( ( s: String ) => Sig.mReturn( FOLConst( s ) ) ) |
       lift( variable ) | number ~> ( ( s: String ) => Sig.mReturn( FOLConst( s ) ) ) | distinct_object ~> ( ( s: String ) => Sig.mReturn( FOLConst( s ) ) )
   }
@@ -303,18 +347,59 @@ class TptpParser( val input: ParserInput ) extends Parser {
   // ==========
   // tff
   // ==========
-  //
-  private def tff_logic_formula: Rule1[SigTo[Formula]] = rule { tff_unit_formula }
 
+  //TODO:
+  private def tff_logic_formula: Rule1[SigTo[Formula]] = rule { tff_unitary_formula | tff_unary_formula | tff_binary_formula | tff_defined_infix }
+
+  //TODO:
   private def tff_unit_formula: Rule1[SigTo[Formula]] = rule { "(" ~ Ws ~ tff_logic_formula ~ Ws ~ ")" | tff_quantified_formula }
+  private def tff_unitary_formula: Rule1[SigTo[Formula]] = rule { tff_quantified_formula | (tff_atomic_formula) | "(" ~ tff_logic_formula ~ ")" }
 
-  private def tff_quantified_formula = rule { fol_quantifier ~ Ws ~ "[" ~ tff_variable_list ~ "]" ~ Ws ~ ":" ~ Ws ~ tff_logic_formula ~> ( ( q: QuantifierHelper, vs, m ) => ( sig: Sig ) => q.Block( vs( sig ), m( sig ) ) ) }
+  // This deviates a bit from the grammar
+  // First, we extract the tff_unit_formula that is the first element in both the tff_binary_assoc and the tff_binary_nonassoc
+  private def tff_binary_formula = rule {tff_unit_formula ~ Ws ~ (tff_binary_assoc | tff_binary_nonassoc)}
+  // we then split the binary_assoc into <and> and <or>
+  private def tff_binary_assoc = rule { tff_or_formula_part | tff_and_formula_part }
+  // here, we can now exploit that we always have the tff_unit_formula in front in the tff_binary_formula, so now we can do (| <tff_unit_formula>)+
+  private def tff_or_formula_part = rule { ( "|" ~ Ws ~ tff_unit_formula ).+ ~> ( ( a: SigTo[Formula], as: Seq[SigTo[Formula]] ) => (sig: Sig) => Or.leftAssociative( a(sig) +: sig(as): _* ) ) }
+  private def tff_and_formula_part = rule { ( "&" ~ Ws ~ tff_unit_formula ).+ ~> ( ( a: SigTo[Formula], as: Seq[SigTo[Formula]] ) => (sig: Sig) => And.leftAssociative( a(sig) +: sig(as): _* ) ) }
+  // for the nonassoc connectives we do the same as above without the repition
+  private def tff_binary_nonassoc = rule { binary_connective ~ tff_unit_formula ~> ( ( a: SigTo[Formula], c: ( Expr, Expr ) => Formula, b: SigTo[Formula] ) => ( sig: Sig ) => c( a( sig ), b( sig ) ) ) }
+
+
+  // TODO: this is theoretically missing <ntf_short_connective> but ntf is not scope of this extension
+  private def tff_unary_formula = rule { "~" ~ Ws ~ tff_unitary_formula ~> ( (formula: SigTo[Formula]) => (sig: Sig) => Neg(formula(sig)) ) }
+  
+  // TODO:
+  private def tff_atomic_formula = rule { lift(defined_prop) | lift(infix_formula) | lift(plain_atomic_formula) | ( distinct_object ~> ( obj => Sig.mReturn(FOLAtom( obj )) ) ) }
+
+  private def tff_infix_formula = rule { MISMATCH }
+
+  private def tff_quantified_formula = rule { fol_quantifier ~ Ws ~ "[" ~ tff_variable_list ~ "]" ~ Ws ~ ":" ~ Ws ~ tff_unit_formula ~> ( ( q: QuantifierHelper, vs, m ) => ( sig: Sig ) => q.Block( vs( sig ), m( sig ) ) ) }
 
   private def tff_variable_list = rule { tff_variable.+.separatedBy( Comma ) ~> ( ( vs: Seq[SigTo[Var]] ) => ( sig: Sig ) => sig.apply( vs ) ) }
 
   private def tff_variable: Rule1[SigTo[Var]] = rule { capture( upper_word ) ~ Ws ~ ":" ~ Ws ~ tff_atomic_type ~> ( ( sym: String, t: SigTo[Ty] ) => ( ( sig: Sig ) => Var( sym, t( sig ) ) ) ) }
 
-  private def tff_top_level_type: Rule1[SigTo[Ty]] = rule { tff_atomic_type | tff_non_atomic_type }
+  private def tff_defined_infix = rule {tff_unitary_term ~ Ws ~ tff_defined_infix_pred ~ Ws ~ tff_unitary_term ~> ((left: SigTo[Expr], binaryPred, right: SigTo[Expr]) => (sig: Sig) => binaryPred(left(sig), right(sig)) )}
+
+  private def tff_defined_infix_pred = rule { ("=" ~ push( (left: Expr, right: Expr) => Eq(left, right)) ) }
+
+  // This is the most cursed part of this extension
+  // The current EBNF syntax describes TFX syntax, where terms and formulas are mixed up
+  // For now, I will try to use the fof_term definition, just extended with types
+  // private def tff_unitary_term = rule {tff_defined_term | tff_variable}
+
+  private def tff_term: Rule1[SigTo[Expr]] = rule {  tff_variable | tff_defined_term | tff_function_term }
+  private def tff_unitary_term = tff_term
+  private def tff_function_term = rule {name ~ ( "(" ~ Ws ~ tff_term.+.separatedBy( Comma ) ~ ")" ~ Ws ).? ~> ( ( hd, as ) => (sig: Sig) => TptpTerm( hd, as.getOrElse( Seq() ), sig ) ) }
+  // private def tff_arguments = rule { tff_term.+.separatedBy( Comma ) ~> ((term: SigTo[Expr], terms: Seq[SigTo[Expr]]) => (sig: Sig) => term(sig) +: sig(terms)) }
+
+  private def tff_defined_term = rule {
+    ( distinct_object ~> ( (constName) => Sig.mReturn (FOLConst( constName ) ) ) ) | ( number ~> ( (num) => Sig.mReturn(FOLConst( num ) ) ) )
+  }
+
+  private def tff_top_level_type: Rule1[SigTo[Ty]] = rule { tff_non_atomic_type | tff_atomic_type }
 
   private def tff_non_atomic_type: Rule1[SigTo[Ty]] = rule { tff_mapping_type } // TODO:
 
@@ -322,31 +407,10 @@ class TptpParser( val input: ParserInput ) extends Parser {
     tff_unitary_type ~ Ws ~ ">" ~ Ws ~ tff_atomic_type ~> ( ( f: SigTo[Ty], t: SigTo[Ty] ) => ( sig: Sig ) => {
       val from = f( sig )
       val to = t( sig )
+
       if ( containsTy( from, To ) ) throw new TptpNotYetImplementedException( "Currently there is only support for TF0, so no $o parameters to functions and predicates" )
 
-      val ( fromVars, fromTypes ) = partitionTypesAndVars( from )
-      if ( fromVars.nonEmpty && fromTypes.isEmpty ) {
-        to match {
-          case TVar( name ) => {
-            from ->: to
-          }
-          case _ => {
-            throw new MalformedInputFileException( "Illegal mix of types and type vars" )
-          }
-        }
-      } else if ( fromVars.isEmpty && fromTypes.nonEmpty ) {
-        to match {
-          case TVar( name ) => {
-            throw new MalformedInputFileException( s"Illegal mix of types and type vars, from: $fromVars | $fromTypes, to: $to" )
-          }
-          case _ => {
-            
-            from ->: to
-          }
-        }
-      } else {
-        throw new MalformedInputFileException( "Illegal mix of types and type vars" )
-      }
+      from ->: to
     } )
   }
 
@@ -390,8 +454,8 @@ class TptpParser( val input: ParserInput ) extends Parser {
         case "$real"  => TReal
         case "$rat"   => TRat
         case "$int"   => TInt
-        // case "$tType" => throw new TptpNotYetImplementedException( "Currently there is no support for TFF1, so $tType can only appear in \"tff(user_sort_type, type, user_sort: $tType).\" style fragments" )
-        case "$tType" => sig.getNextTyVar
+        case "$tType" => throw new TptpNotYetImplementedException( "Currently there is no support for TFF1, so $tType can only appear in \"tff(user_sort_type, type, user_sort: $tType).\" style fragments" )
+        // case "$tType" => sig.getNextTyVar
         case name     => throw new MalformedInputFileException( "Expected $o, $oType, $i, $iType, $real, $int, $rat, got unexpected dollar word type \"" + name + "\"" )
       } ) )
 
@@ -444,6 +508,7 @@ class TptpParser( val input: ParserInput ) extends Parser {
   //     ( sig: Sig ) => TptpAtom( p, as.map( sig( _ ) ).getOrElse( Seq() ), sig ) )
   // }
   // private def tff_infix_formula = rule { tff_term ~ ( "=" ~ Ws ~ tff_term ~> ( ( a: SigTo[Expr], b ) => ( sig: Sig ) => Eq( a( sig ): Expr, b( sig ) ) ) | "!=" ~ Ws ~ tff_term ~> ( ( a: SigTo[Expr], b ) => ( sig: Sig ) => ( a( sig ): Expr ) !== b( sig ) ) ) }
+  //
   //
   // private def tff_term: Rule1[SigTo[Expr]] = rule { tff_variable | ( distinct_object ~> ( d => Sig.mReturn( FOLConst( d ) ) ) ) | tff_number | tff_defined_function_term | tff_function_term | tff_non_atomic_formula }
   //

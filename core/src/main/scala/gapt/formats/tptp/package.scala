@@ -61,7 +61,7 @@ package object tptp {
   case class AnnotatedFormula( language: String, name: String, role: FormulaRole, formula: Formula, annotations: Seq[GeneralTerm] ) extends TptpInput
   case class IncludeDirective( fileName: String, formulaSelection: Option[Seq[String]] ) extends TptpInput
   case class TypeDef( lang: String, name: String, tyName: String, ty: Ty, annotations: Seq[GeneralTerm] ) extends TptpInput
-  case class ConstDef( lang: String, name: String, varName: String, v: Var, annotations: Seq[GeneralTerm] ) extends TptpInput
+  case class ConstDef( lang: String, name: String, varName: String, ty: Ty, annotations: Seq[GeneralTerm] ) extends TptpInput
 
   object TptpTerm {
     def apply( sym: String, args: Seq[Expr] ): Expr =
