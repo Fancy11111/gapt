@@ -38,7 +38,7 @@ import gapt.logic.fol.arithmetic.Lesser
 import gapt.logic.fol.arithmetic.Greater
 import gapt.logic.fol.arithmetic.LesserEq
 
-class Ctx( val vars: Map[String, Var], val types: Map[String, Ty] ) {
+class Ctx( val constants: Map[String, Const], val variables: Map[String, Var], val types: Map[String, Ty] ) {
 
   def apply[A]( to: A ): A = to
 
@@ -65,33 +65,44 @@ object Ctx {
     ( ctx ) => value
   }
 
-  def unapply( ctx: Ctx ): Option[Tuple2[Map[String, Var], Map[String, Ty]]] = {
-    Some( ( ctx.vars, ctx.types ) )
+  def unapply( ctx: Ctx ): Option[Tuple3[Map[String, Const], Map[String, Var], Map[String, Ty]]] = {
+    Some( ( ctx.constants, ctx.variables, ctx.types ) )
   }
 
-  def apply( vars: Map[String, Var], types: Map[String, Ty] ): Ctx = {
-    new Ctx( vars, types )
+  def apply( constants: Map[String, Const], variables: Map[String, Var], types: Map[String, Ty] ): Ctx = {
+    new Ctx( constants, variables, types )
+  }
+
+  def apply( ctx: Ctx, name: String, c: Const ): Ctx = {
+    Ctx( ctx.constants + ( name -> c ), ctx.variables, ctx.types )
   }
 
   def apply( ctx: Ctx, name: String, v: Var ): Ctx = {
-    Ctx( ctx.vars + ( name -> v ), ctx.types )
+    Ctx( ctx.constants, ctx.variables + ( name -> v ), ctx.types )
   }
 
-  def apply( ctx: Ctx, addVars: Seq[Var] ): Ctx = {
-    Ctx( ctx.vars ++ ( addVars map {
-      case Var( name, ty ) => ( name, Var( name, ty ) )
+  def apply( ctx: Ctx, addConsts: Seq[Const] ): Ctx = {
+    Ctx( ctx.constants ++ ( addConsts map {
+      case c @ Const( name, _ty, _typevars ) => ( name, c )
+    } ).toMap, ctx.variables, ctx.types )
+  }
+
+  def applyToVars( ctx: Ctx, addVars: Seq[Var] ): Ctx = {
+    Ctx( ctx.constants, ctx.variables ++ ( addVars map {
+      case v @ Var( name, _ ) => ( name, v )
     } ).toMap, ctx.types )
   }
 
   def apply( ctx: Ctx, name: String, t: Ty ): Ctx = {
-    Ctx( ctx.vars, ctx.types + ( name -> t ) )
+    Ctx( ctx.constants, ctx.variables, ctx.types + ( name -> t ) )
   }
 
   def apply(): Ctx = {
-    new Ctx( Map.empty[String, Var], Map.empty[String, Ty] )
+    new Ctx( Map.empty[String, Const], Map.empty[String, Var], Map.empty[String, Ty] )
   }
 
   val default = new Ctx(
+    Map(),
     Map(),
     Map(
       "$real" -> TReal,
@@ -157,7 +168,7 @@ class TptpParser( val input: ParserInput ) extends Parser {
 
   private def atom_def_formula: Rule1[CtxTo[ConstDef]] = rule {
     atomic_word ~ "(" ~ Ws ~ name ~ Comma ~ Ws ~ "type" ~ Ws ~ Comma ~ Ws ~ atomic_word ~ Ws ~ ":" ~ Ws ~ tff_complex_type ~ annotations ~ ")." ~ Ws ~>
-      ( ( lang: String, name: String, varName: String, ty: CtxTo[Ty], ann: Seq[CtxTo[GeneralTerm]] ) => ( ctx: Ctx ) => ( ConstDef( lang, name, varName, Var( varName, ty( ctx ) ), ann.map( _( ctx ) ) ) ) )
+      ( ( lang: String, name: String, varName: String, ty: CtxTo[Ty], ann: Seq[CtxTo[GeneralTerm]] ) => ( ctx: Ctx ) => ( ConstDef( lang, name, varName, Const( varName, ty( ctx ) ), ann.map( _( ctx ) ) ) ) )
   }
 
   private def tff_annotated_formula: Rule1[CtxTo[TptpInput]] = rule {
@@ -248,7 +259,7 @@ class TptpParser( val input: ParserInput ) extends Parser {
   def tff_quantified_formula = rule {
     fol_quantifier ~ "[" ~ Ws ~ tff_variable_list ~ "]" ~ Ws ~ ":" ~ Ws ~ tff_unitary_formula ~> ( ( q: QuantifierHelper, variable_list, formula ) => ( ctx: Ctx ) => {
       val vars = variable_list.map( _( ctx ) )
-      q.Block( vars, formula( Ctx( ctx, vars ) ) )
+      q.Block( vars, formula( Ctx.applyToVars( ctx, vars ) ) )
     } )
   }
   private def tff_unary_formula = rule { "~" ~ Ws ~ tff_unitary_formula ~> ( f => ( ctx: Ctx ) => Neg( f( ctx ) ) ) }
@@ -289,8 +300,9 @@ class TptpParser( val input: ParserInput ) extends Parser {
     name ~ ( "(" ~ Ws ~ tff_term.+.separatedBy( Comma ) ~ ")" ~ Ws ).? ~> ( ( hd: String, as: Option[Seq[CtxTo[Expr]]] ) => ( ( ctx: Ctx ) => TptpTerm( hd, as.getOrElse( Seq() ), ctx ) ) )
   }
   private def tff_defined_function_term: Rule1[CtxTo[Expr]] = rule {
-    // unary operators
-    tff_unary_arithmetic_op( "$uminus" ) |
+    lift( defined_prop ) |
+      // unary operators
+      tff_unary_arithmetic_op( "$uminus" ) |
       tff_unary_arithmetic_op( "$floor" ) |
       tff_unary_arithmetic_op( "$ceiling" ) |
       tff_unary_arithmetic_op( "$truncate" ) |
@@ -339,7 +351,7 @@ class TptpParser( val input: ParserInput ) extends Parser {
     capture( upper_word ) ~ Ws ~> ( ( n: String ) => ( ctx: Ctx ) =>
       {
         // TODO: are all variables necessarily quantified
-        ctx.vars.get( n ).getOrElse( Var( n, Ti ) )
+        ctx.variables.get( n ).getOrElse( Var( n, Ti ) )
       } )
   }
 

@@ -61,7 +61,7 @@ package object tptp {
   case class AnnotatedFormula( language: String, name: String, role: FormulaRole, formula: Formula, annotations: Seq[GeneralTerm] ) extends TptpInput
   case class IncludeDirective( fileName: String, formulaSelection: Option[Seq[String]] ) extends TptpInput
   case class TypeDef( lang: String, name: String, tyName: String, ty: Ty, annotations: Seq[GeneralTerm] ) extends TptpInput
-  case class ConstDef( lang: String, name: String, varName: String, v: Var, annotations: Seq[GeneralTerm] ) extends TptpInput
+  case class ConstDef( lang: String, name: String, varName: String, v: Const, annotations: Seq[GeneralTerm] ) extends TptpInput
 
   object TptpTerm {
     def apply( sym: String, args: Seq[Expr] ): Expr =
@@ -71,9 +71,13 @@ package object tptp {
     def apply( sym: String, args: Expr* )( implicit dummyImplicit: DummyImplicit ): Expr =
       TptpTerm( sym, args )
     def apply( sym: String, args: Seq[Ctx => Expr], ctx: Ctx ): Expr = {
-      val argtypes = ctx.vars.get( sym ).map( _.ty ).getOrElse(
-        throw new RuntimeException( s"Can not find types of $sym : ${ctx.vars.get( sym )} in context!" ) )
-      Apps( Const( sym, argtypes ), ctx( args ) )
+      val const_or_var = ctx.constants.getOrElse(
+        sym,
+        ctx.variables.getOrElse(
+          sym,
+          throw new RuntimeException( s"Can not find types of $sym : constants ${ctx.constants} and variables ${ctx.variables} in context!" ) ) )
+
+      Apps( const_or_var, ctx( args ) )
     }
 
     def unapplySeq( expr: Expr ): Option[( String, Seq[Expr] )] = expr match {
@@ -133,7 +137,7 @@ package object tptp {
   def TptpAtom( sym: String, args: Seq[Expr], ctx: Ctx ): Atom = {
 
     ( sym, args ) match {
-      case _ => Apps( Const( sym, ctx.vars.get( sym ).getOrElse( throw new RuntimeException( "var with name " + sym + " not found" ) ).ty ), args ).asInstanceOf[Atom]
+      case _ => Apps( Const( sym, ctx.constants.get( sym ).getOrElse( throw new RuntimeException( "var with name " + sym + " not found" ) ).ty ), args ).asInstanceOf[Atom]
     }
   }
 
