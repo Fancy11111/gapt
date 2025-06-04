@@ -37,6 +37,7 @@ import gapt.logic.fol.arithmetic.TInt
 import gapt.logic.fol.arithmetic.Lesser
 import gapt.logic.fol.arithmetic.Greater
 import gapt.logic.fol.arithmetic.LesserEq
+import gapt.logic.AllDistinct
 
 class Ctx( val constants: Map[String, Const], val variables: Map[String, Var], val types: Map[String, Ty] ) {
 
@@ -268,6 +269,22 @@ class TptpParser( val input: ParserInput ) extends Parser {
   private def tff_defined_predicate_formula = rule {
     tff_defined_unary_predicate ~ "(" ~ Ws ~ tff_term ~ Ws ~ ")" ~> ( ( p, a ) => ( ctx: Ctx ) => p( a( ctx ) ) ) |
       tff_defined_binary_predicate ~ "(" ~ Ws ~ tff_term ~ Comma ~ tff_term ~ Ws ~ ")" ~> ( ( p, a, b ) => ( ctx: Ctx ) => p( a( ctx ), b( ctx ) ) )
+  }
+
+  private def tff_distinct_predicate = rule {
+    "$distinct" ~ "(" ~ Ws ~ tff_term.+.separatedBy( Comma ) ~ Ws ~ ")" ~> ( ( a: Seq[CtxTo[Expr]] ) => ( ctx: Ctx ) => {
+      val vs = a.map( _( ctx ) )
+      val first = vs.head.ty
+      val allEqualTy = vs.tail.map( _.ty ).foldLeft( ( first, true ) )( ( acc, ty ) =>
+        if ( acc._2 && ty == first )
+          ( first, true )
+        else
+          ( ty, false ) )._2
+      if ( !allEqualTy ) {
+        throw new MalformedInputFileException( "Distinct predicate arguments must have same type" )
+      }
+      AllDistinct( ctx( a ): _* )
+    } )
   }
 
   private def tff_defined_unary_predicate = rule {
