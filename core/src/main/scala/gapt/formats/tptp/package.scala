@@ -6,6 +6,7 @@ import gapt.expr.formula.Eq
 import gapt.expr.formula.Formula
 import gapt.expr.formula.hol.existentialClosure
 import gapt.expr.ty.FunctionType
+import gapt.expr.ty.Ty
 import gapt.expr.ty.Ti
 import gapt.expr.ty.To
 import gapt.proofs._
@@ -24,6 +25,8 @@ package object tptp {
         Sequent() :+ formula
       case AnnotatedFormula(_, _, _, formula, _) =>
         formula +: Sequent()
+      case TopLevelDefinition(_, _, _, _, _) => // TODO:
+        Sequent()
       case in => throw new IllegalArgumentException(in.toString)
     })
 
@@ -34,6 +37,8 @@ package object tptp {
         case AnnotatedFormula(_, _, _, formula, _) =>
           formula +: Sequent()
         case IncludeDirective(_, _) =>
+          Sequent()
+        case TopLevelDefinition(_, _, _, _, _) => // TODO:
           Sequent()
       })
       val names = inputs.collect({
@@ -48,8 +53,10 @@ package object tptp {
   sealed trait TptpInput {
     override def toString = TptpToString.tptpInput(this)
   }
+
   case class AnnotatedFormula(language: String, name: String, role: FormulaRole, formula: Formula, annotations: Seq[GeneralTerm]) extends TptpInput
   case class IncludeDirective(fileName: String, formulaSelection: Option[Seq[String]]) extends TptpInput
+  case class TopLevelDefinition(language: String, name: String, symbolName: String, ty: Ty, annotations: Seq[GeneralTerm]) extends TptpInput
 
   object TptpTerm {
     def apply(sym: String, args: Seq[Expr]): Expr =
